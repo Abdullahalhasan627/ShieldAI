@@ -1,657 +1,1025 @@
-// SelfProtection.cpp - Security Module
-// نظام الحماية الذاتية للبرنامج - Anti-Tampering & Self-Defense
+﻿/**
+ * Quarantine.cpp
+ *
+ * مدير الحجر الصحي - Quarantine Manager
+ *
+ * المسؤوليات:
+ * - عزل الملفات الخبيثة في موقع آمن ومشفر
+ * - تشفير الملفات المعزولة لمنع التنفيذ العرضي
+ * - تسجيل البيانات الوصفية (المسار الأصلي، نوع التهديد، وقت الاكتشاف)
+ * - استعادة الملفات إلى موقعها الأصلي (إذا كان خطأ)
+ * - الحذف النهائي الآمن (Secure Deletion)
+ * - منع الوصول غير المصرح به للملفات المعزولة
+ * - التكامل مع FileScanner و AIDetector
+ *
+ * آلية الأمان:
+ * 1. تشفير AES-256 للملفات
+ * 2. تغيير الامتداد إلى .quarantine
+ * 3. تخزين في مجلد محمي بـ ACLs (صلاحيات NTFS)
+ * 4. Metadata مشفرة في قاعدة بيانات SQLite (Stub)
+ *
+ * متطلبات: C++17, Windows API, Cryptography API (BCrypt)
+ */
 
-#include <iostream>
+#include <windows.h>
+#include <wincrypt.h>
+#include <bcrypt.h>
+#include <sddl.h>
+#include <accctrl.h>
+#include <aclapi.h>
 #include <string>
 #include <vector>
-#include <thread>
-#include <atomic>
-#include <chrono>
+#include <map>
+#include <memory>
 #include <mutex>
-#include <functional>
-#include <windows.h>
-#include <tlhelp32.h>
-#include <psapi.h>
-#include <aclapi.h>
-#include <sddl.h>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
+#include <filesystem>
+#include <algorithm>
+#include <random>
 
+ // TODO: تضمين مكتبة SQLite عند الحاجة
+ // #include "sqlite3.h"
+
+#pragma comment(lib, "bcrypt.lib")
 #pragma comment(lib, "advapi32.lib")
-#pragma comment(lib, "psapi.lib")
 
-// ==================== هيكل حالة الحماية ====================
+namespace fs = std::filesystem;
 
-struct ProtectionStatus {
-    bool isProtected;
-    bool isRunningElevated;
-    bool isDebuggerAttached;
-    bool isVirtualized;
-    int integrityLevel;
-    std::vector<std::string> activeDefenses;
-    std::chrono::system_clock::time_point startTime;
-};
+namespace AIAntivirus {
 
-// ==================== الحماية الذاتية الرئيسية ====================
+    // ==================== تعريفات الأنواع ====================
 
-class SelfProtection {
-private:
-    std::atomic<bool> isActive{ false };
-    std::atomic<bool> isTampered{ false };
-    std::thread watchdogThread;
-    std::thread integrityThread;
-    std::vector<std::thread> defenseThreads;
+    /**
+     * معلومات ملف معزول
+     */
+    struct QuarantineEntry {
+        std::wstring quarantineId;          // معرف فريد (UUID)
+        std::wstring originalPath;          // المسار الأصلي قبل العزل
+        std::wstring fileName;              // اسم الملف الأصلي
+        std::wstring quarantinePath;        // المسار الحالي في الحجر
+        std::string threatName;             // اسم التهديد المكتشف
+        std::string detectionMethod;        // طريقة الاكتشاف (AI, Heuristic, etc.)
+        float threatScore;                  // درجة الخطورة
+        std::chrono::system_clock::time_point detectionTime;
+        std::chrono::system_clock::time_point quarantineTime;
+        uint64_t originalFileSize;
+        std::string originalHash;           // SHA-256 قبل العزل
+        std::string encryptedHash;          // SHA-256 بعد التشفير
+        bool isEncrypted;                   // هل تم التشفير بنجاح؟
+        bool isCompressed;                  // هل تم الضغط؟
+        std::string encryptionKeyId;        // معرف مفتاح التشفير
+        std::string metadata;               // بيانات إضافية (JSON)
+    };
 
-    // معلومات العملية
-    DWORD ownProcessId;
-    HANDLE ownProcessHandle;
-    std::wstring processName;
-    std::wstring processPath;
+    /**
+     * نتيجة عملية العزل
+     */
+    enum class QuarantineResult {
+        SUCCESS,                // نجاح
+        ALREADY_QUARANTINED,    // موجود مسبقاً
+        ACCESS_DENIED,          // رفض الوصول
+        FILE_NOT_FOUND,         // الملف غير موجود
+        ENCRYPTION_FAILED,      // فشل التشفير
+        INSUFFICIENT_SPACE,     // مساحة غير كافية
+        DATABASE_ERROR,         // خطأ في قاعدة البيانات
+        UNKNOWN_ERROR           // خطأ غير معروف
+    };
 
-    // دوائر التحقق
-    std::vector<std::function<bool()>> integrityChecks;
-    std::vector<std::function<void()>> tamperResponses;
+    /**
+     * إعدادات الحجر
+     */
+    struct QuarantineConfig {
+        std::wstring quarantineRoot = L"C:\\ProgramData\\AIAntivirus\\Quarantine\\";
+        bool encryptFiles = true;               // تشفير الملفات
+        bool compressFiles = true;              // ضغط قبل التشفير
+        bool secureDeleteOriginal = false;      // حذف آمن للأصلي
+        int retentionDays = 30;                 // أيام الاحتفاظ
+        size_t maxQuarantineSizeMB = 1024;      // حد أقصى 1GB
+        std::string encryptionAlgorithm = "AES-256-GCM";
+    };
 
-    // معالجات الحماية
-    HANDLE hJobObject = NULL;
+    /**
+     * إحصائيات الحجر
+     */
+    struct QuarantineStats {
+        size_t totalFiles;
+        size_t totalSizeBytes;
+        size_t encryptedFiles;
+        size_t compressedFiles;
+        size_t restoredFiles;       // تم استعادته
+        size_t deletedFiles;        // تم حذفه نهائياً
+        std::chrono::system_clock::time_point oldestEntry;
+    };
 
-public:
-    SelfProtection() {
-        std::cout << "[INIT] Self-Protection System Initializing...\n";
+    // ==================== الفئة الرئيسية: QuarantineManager ====================
 
-        ownProcessId = GetCurrentProcessId();
-        ownProcessHandle = GetCurrentProcess();
+    class QuarantineManager {
+    public:
+        // ==================== Singleton Pattern ====================
 
-        // الحصول على معلومات العملية
-        WCHAR path[MAX_PATH];
-        GetModuleFileNameW(NULL, path, MAX_PATH);
-        processPath = path;
-        processName = std::wstring(path).substr(
-            std::wstring(path).find_last_of(L"\\") + 1);
-
-        initializeDefenses();
-    }
-
-    ~SelfProtection() {
-        deactivate();
-        std::cout << "[SHUTDOWN] Self-Protection deactivated\n";
-    }
-
-    // ==================== التهيئة والتفعيل ====================
-
-    bool activate() {
-        if (isActive) return true;
-
-        std::cout << "[ACTIVATING] Starting self-defense mechanisms...\n";
-
-        // 1. رفع الصلاحيات
-        if (!elevatePrivileges()) {
-            std::cerr << "[WARNING] Running without elevated privileges\n";
+        static QuarantineManager& GetInstance() {
+            static QuarantineManager instance;
+            return instance;
         }
 
-        // 2. حماية الذاكرة
-        if (!protectMemory()) {
-            std::cerr << "[ERROR] Memory protection failed\n";
+        // منع النسخ
+        QuarantineManager(const QuarantineManager&) = delete;
+        QuarantineManager& operator=(const QuarantineManager&) = delete;
+
+        // ==================== واجهة التهيئة ====================
+
+        /**
+         * تهيئة مدير الحجر
+         */
+        bool Initialize(const QuarantineConfig& config = QuarantineConfig{});
+
+        /**
+         * إيقاف وتحرير الموارد
+         */
+        void Shutdown();
+
+        /**
+         * التحقق من التهيئة
+         */
+        bool IsInitialized() const { return m_isInitialized; }
+
+        // ==================== واجهة العزل الرئيسية ====================
+
+        /**
+         * عزل ملف (الوظيفة الأساسية)
+         */
+        QuarantineResult QuarantineFile(const std::wstring& filePath,
+            const std::string& threatName,
+            const std::string& detectionMethod,
+            float threatScore,
+            QuarantineEntry* outEntry = nullptr);
+
+        /**
+         * عزل ملف مع معلومات كاملة
+         */
+        QuarantineResult QuarantineFile(const std::wstring& filePath,
+            const QuarantineEntry& info);
+
+        // ==================== واجهة الإدارة ====================
+
+        /**
+         * الحصول على قائمة الملفات المعزولة
+         */
+        std::vector<QuarantineEntry> GetQuarantinedFiles();
+
+        /**
+         * البحث عن ملف معزول
+         */
+        bool FindEntry(const std::wstring& quarantineId, QuarantineEntry& entry);
+        bool FindEntryByOriginalPath(const std::wstring& originalPath, QuarantineEntry& entry);
+
+        /**
+         * استعادة ملف إلى موقعه الأصلي
+         */
+        QuarantineResult RestoreFile(const std::wstring& quarantineId,
+            const std::wstring& destinationPath = L"");
+
+        /**
+         * حذف ملف نهائيًا من الحجر
+         */
+        QuarantineResult DeletePermanently(const std::wstring& quarantineId,
+            bool secureDelete = true);
+
+        /**
+         * حذف جميع الملفات
+         */
+        QuarantineResult ClearAll(bool secureDelete = true);
+
+        // ==================== واجهة الصيانة ====================
+
+        /**
+         * تنظيف الملفات القديمة (بناءً على retentionDays)
+         */
+        size_t CleanupOldFiles();
+
+        /**
+         * فحص سلامة الملفات المعزولة
+         */
+        bool VerifyIntegrity(const std::wstring& quarantineId);
+
+        /**
+         * الحصول على إحصائيات
+         */
+        QuarantineStats GetStatistics() const;
+
+        /**
+         * تصدير قائمة الحجر (للتقرير)
+         */
+        bool ExportList(const std::wstring& reportPath);
+
+        // ==================== واجهة الأمان المتقدمة ====================
+
+        /**
+         * تغيير مفتاح التشفير (إعادة تشفير كل الملفات)
+         */
+        bool RotateEncryptionKey();
+
+        /**
+         * حظر استعادة ملفات معينة (Threats شديدة الخطورة)
+         */
+        bool BlockRestore(const std::wstring& quarantineId, const std::string& reason);
+
+        /**
+         * التحقق مما إذا كان ملف في الحجر
+         */
+        bool IsQuarantined(const std::wstring& filePath) const;
+
+    private:
+        // ==================== الأعضاء الخاصة ====================
+
+        QuarantineManager() = default;
+        ~QuarantineManager() { Shutdown(); }
+
+        bool m_isInitialized = false;
+        QuarantineConfig m_config;
+        std::wstring m_databasePath;
+
+        // التزامن
+        mutable std::mutex m_mutex;
+        mutable std::shared_mutex m_entriesMutex;
+
+        // الكاش في الذاكرة
+        std::map<std::wstring, QuarantineEntry> m_entries;
+
+        // معالج التشفير
+        BCRYPT_ALG_HANDLE m_hAesProvider = NULL;
+        std::vector<BYTE> m_encryptionKey;
+
+        // ==================== وظائف الأمان والتشفير ====================
+
+        /**
+         * إعداد مجلد الحجر بحماية كاملة
+         */
+        bool SetupQuarantineDirectory();
+
+        /**
+         * تعيين صلاحيات NTFS على مجلد
+         */
+        bool SetDirectoryACLs(const std::wstring& path);
+
+        /**
+         * تشفير ملف
+         */
+        bool EncryptFile(const std::wstring& sourcePath,
+            const std::wstring& destPath,
+            std::string& outHash);
+
+        /**
+         * فك تشفير ملف
+         */
+        bool DecryptFile(const std::wstring& sourcePath,
+            const std::wstring& destPath);
+
+        /**
+         * ضغط ملف (اختياري)
+         */
+        bool CompressFile(const std::wstring& sourcePath,
+            const std::wstring& destPath);
+
+        /**
+         * فك ضغط ملف
+         */
+        bool DecompressFile(const std::wstring& sourcePath,
+            const std::wstring& destPath);
+
+        /**
+         * حذف آمن (Secure Deletion - Overwriting)
+         */
+        bool SecureDelete(const std::wstring& filePath, int passes = 3);
+
+        /**
+         * إنشاء معرف فريد (UUID)
+         */
+        static std::wstring GenerateUUID();
+
+        /**
+         * حساب SHA-256
+         */
+        static std::string CalculateSHA256(const std::wstring& filePath);
+
+        // ==================== وظائف قاعدة البيانات ====================
+
+        /**
+         * تحميل الإدخالات من قاعدة البيانات
+         */
+        bool LoadEntriesFromDatabase();
+
+        /**
+         * حفظ إدخال في قاعدة البيانات
+         */
+        bool SaveEntryToDatabase(const QuarantineEntry& entry);
+
+        /**
+         * حذف إدخال من قاعدة البيانات
+         */
+        bool RemoveEntryFromDatabase(const std::wstring& quarantineId);
+
+        /**
+         * تحديث إدخال في قاعدة البيانات
+         */
+        bool UpdateEntryInDatabase(const QuarantineEntry& entry);
+
+        // ==================== وظائف مساعدة ====================
+
+        /**
+         * التحقق من توفر مساحة كافية
+         */
+        bool CheckDiskSpace(uint64_t requiredBytes);
+
+        /**
+         * نسخ بيانات وصفية للملف (Alternate Data Streams)
+         */
+        bool WriteMetadataToADS(const std::wstring& filePath,
+            const QuarantineEntry& entry);
+
+        /**
+         * قراءة بيانات وصفية من ADS
+         */
+        bool ReadMetadataFromADS(const std::wstring& filePath,
+            QuarantineEntry& entry);
+
+        /**
+         * إنشاء مسار عشوائي للملف المعزول
+         */
+        std::wstring GenerateQuarantinePath(const std::wstring& originalName);
+
+        /**
+         * تسجيل العمليات (Logging)
+         */
+        void LogOperation(const std::string& operation,
+            const std::wstring& fileId,
+            bool success,
+            const std::string& details = "");
+    };
+
+    // ==================== التنفيذ (Implementation) ====================
+
+    bool QuarantineManager::Initialize(const QuarantineConfig& config) {
+        std::lock_guard<std::mutex> lock(m_mutex);
+
+        if (m_isInitialized) {
+            Shutdown();
         }
 
-        // 3. منع تصحيح الأخطاء
-        if (!preventDebugging()) {
-            std::cerr << "[WARNING] Debug protection limited\n";
-        }
+        m_config = config;
 
-        // 4. حماية العملية
-        if (!protectProcess()) {
-            std::cerr << "[ERROR] Process protection failed\n";
-        }
-
-        // 5. إخفاء البرنامج (اختياري)
-        hideFromTaskManager();
-
-        // 6. بدء المراقبة المستمرة
-        startWatchdog();
-        startIntegrityMonitor();
-
-        isActive = true;
-        std::cout << "[SUCCESS] Self-protection ACTIVE\n";
-
-        displayStatus();
-
-        return true;
-    }
-
-    void deactivate() {
-        if (!isActive) return;
-
-        isActive = false;
-
-        // إيقاف الخيوط
-        if (watchdogThread.joinable()) watchdogThread.join();
-        if (integrityThread.joinable()) integrityThread.join();
-
-        for (auto& t : defenseThreads) {
-            if (t.joinable()) t.join();
-        }
-
-        // إغلاق مقابض
-        if (hJobObject) {
-            CloseHandle(hJobObject);
-            hJobObject = NULL;
-        }
-    }
-
-    // ==================== رفع الصلاحيات ====================
-
-private:
-    bool elevatePrivileges() {
-        HANDLE hToken;
-        TOKEN_ELEVATION elevation;
-        DWORD size;
-
-        if (!OpenProcessToken(ownProcessHandle, TOKEN_QUERY, &hToken)) {
+        // 1. إنشاء مجلد الحجر إذا لم يكن موجوداً
+        if (!SetupQuarantineDirectory()) {
             return false;
         }
 
-        BOOL result = GetTokenInformation(hToken, TokenElevation,
-            &elevation, sizeof(elevation), &size);
-        CloseHandle(hToken);
-
-        if (result && elevation.TokenIsElevated) {
-            std::cout << "[INFO] Running with elevated privileges\n";
-
-            // تعيين مستوى النزاهة العالي
-            setHighIntegrityLevel();
-            return true;
-        }
-
-        return false;
-    }
-
-    bool setHighIntegrityLevel() {
-        HANDLE hToken;
-        if (!OpenProcessToken(ownProcessHandle, TOKEN_ALL_ACCESS, &hToken)) {
-            return false;
-        }
-
-        // تقليل قابلية البرنامج للحقن
-        // (تعقيد - يتطلب SID خاص)
-
-        CloseHandle(hToken);
-        return true;
-    }
-
-    // ==================== حماية الذاكرة ====================
-
-    bool protectMemory() {
-        // حماية صفحات الذاكرة الحرجة من الكتابة
-        SYSTEM_INFO si;
-        GetSystemInfo(&si);
-
-        // الحصول على معلومات الوحدة النمطية
-        MODULEINFO modInfo;
-        HMODULE hMod = GetModuleHandle(NULL);
-
-        if (GetModuleInformation(ownProcessHandle, hMod, &modInfo, sizeof(modInfo))) {
-            // جعل قسم الكود للقراءة فقط (غير قابل للكتابة)
-            DWORD oldProtect;
-            SIZE_T codeSize = modInfo.SizeOfImage;
-
-            // حماية: منع التعديل على الكود
-            if (!VirtualProtect(modInfo.EntryPoint, 4096,
-                PAGE_EXECUTE_READ, &oldProtect)) {
+        // 2. إعداد التشفير
+        if (m_config.encryptFiles) {
+            NTSTATUS status = BCryptOpenAlgorithmProvider(&m_hAesProvider,
+                BCRYPT_AES_ALGORITHM,
+                NULL,
+                0);
+            if (!BCRYPT_SUCCESS(status)) {
                 return false;
             }
+
+            // إنشاء مفتاح عشوائي (في التطبيق الحقيقي، يُخزن بأمان)
+            m_encryptionKey.resize(32); // 256-bit
+            std::random_device rd;
+            std::generate(m_encryptionKey.begin(), m_encryptionKey.end(),
+                [&rd]() { return static_cast<BYTE>(rd() % 256); });
         }
 
-        // كشف نقاط التوقف البرمجية (Breakpoints)
-        checkForBreakpoints();
+        // 3. تحميل الإدخالات السابقة
+        LoadEntriesFromDatabase();
 
+        m_isInitialized = true;
         return true;
     }
 
-    void checkForBreakpoints() {
-        // فحص أول بايتات الدوال الحرجة بحثاً عن 0xCC (INT3)
-        BYTE* mainStart = (BYTE*)GetModuleHandle(NULL);
+    void QuarantineManager::Shutdown() {
+        std::lock_guard<std::mutex> lock(m_mutex);
 
-        for (size_t i = 0; i < 100; i++) {
-            if (mainStart[i] == 0xCC) { // نقطة توقف
-                std::cerr << "[ALERT] Debug breakpoint detected!\n";
-                triggerTamperResponse();
-                return;
+        if (m_hAesProvider) {
+            BCryptCloseAlgorithmProvider(m_hAesProvider, 0);
+            m_hAesProvider = NULL;
+        }
+
+        // تنظيف المفتاح من الذاكرة
+        std::fill(m_encryptionKey.begin(), m_encryptionKey.end(), 0);
+        m_encryptionKey.clear();
+
+        m_entries.clear();
+        m_isInitialized = false;
+    }
+
+    QuarantineResult QuarantineManager::QuarantineFile(const std::wstring& filePath,
+        const std::string& threatName,
+        const std::string& detectionMethod,
+        float threatScore,
+        QuarantineEntry* outEntry) {
+        if (!m_isInitialized) {
+            return QuarantineResult::UNKNOWN_ERROR;
+        }
+
+        if (!fs::exists(filePath)) {
+            return QuarantineResult::FILE_NOT_FOUND;
+        }
+
+        // التحقق من عدم وجوده مسبقاً
+        QuarantineEntry existing;
+        if (FindEntryByOriginalPath(filePath, existing)) {
+            return QuarantineResult::ALREADY_QUARANTINED;
+        }
+
+        // التحقق من المساحة
+        uint64_t fileSize = fs::file_size(filePath);
+        if (!CheckDiskSpace(fileSize * 2)) { // ضعف المساحة للتشفير
+            return QuarantineResult::INSUFFICIENT_SPACE;
+        }
+
+        // إنشاء إدخال جديد
+        QuarantineEntry entry;
+        entry.quarantineId = GenerateUUID();
+        entry.originalPath = fs::absolute(filePath).wstring();
+        entry.fileName = fs::path(filePath).filename().wstring();
+        entry.threatName = threatName;
+        entry.detectionMethod = detectionMethod;
+        entry.threatScore = threatScore;
+        entry.detectionTime = std::chrono::system_clock::now();
+        entry.quarantineTime = entry.detectionTime;
+        entry.originalFileSize = fileSize;
+        entry.originalHash = CalculateSHA256(filePath);
+        entry.isEncrypted = false;
+        entry.isCompressed = false;
+
+        // إنشاء مسار الحجر
+        entry.quarantinePath = GenerateQuarantinePath(entry.fileName);
+
+        try {
+            // 1. ضغط (اختياري)
+            std::wstring tempPath = entry.quarantinePath + L".tmp";
+            if (m_config.compressFiles) {
+                if (CompressFile(filePath, tempPath)) {
+                    entry.isCompressed = true;
+                }
+                else {
+                    tempPath = entry.quarantinePath + L".tmp";
+                    fs::copy_file(filePath, tempPath, fs::copy_options::overwrite_existing);
+                }
             }
+            else {
+                fs::copy_file(filePath, tempPath, fs::copy_options::overwrite_existing);
+            }
+
+            // 2. تشفير
+            if (m_config.encryptFiles) {
+                if (EncryptFile(tempPath, entry.quarantinePath, entry.encryptedHash)) {
+                    entry.isEncrypted = true;
+                    fs::remove(tempPath);
+                }
+                else {
+                    fs::remove(tempPath);
+                    return QuarantineResult::ENCRYPTION_FAILED;
+                }
+            }
+            else {
+                fs::rename(tempPath, entry.quarantinePath);
+            }
+
+            // 3. كتابة Metadata في ADS
+            WriteMetadataToADS(entry.quarantinePath, entry);
+
+            // 4. حفظ في قاعدة البيانات
+            SaveEntryToDatabase(entry);
+
+            // 5. إضافة للكاش
+            {
+                std::unique_lock<std::shared_mutex> lock(m_entriesMutex);
+                m_entries[entry.quarantineId] = entry;
+            }
+
+            // 6. حذف الأصلي (بشكل آمن أو عادي)
+            if (m_config.secureDeleteOriginal) {
+                SecureDelete(filePath);
+            }
+            else {
+                fs::remove(filePath);
+            }
+
+            if (outEntry) {
+                *outEntry = entry;
+            }
+
+            LogOperation("QUARANTINE", entry.quarantineId, true);
+            return QuarantineResult::SUCCESS;
+
+        }
+        catch (const fs::filesystem_error& e) {
+            LogOperation("QUARANTINE", entry.quarantineId, false, e.what());
+            return QuarantineResult::UNKNOWN_ERROR;
         }
     }
 
-    // ==================== منع التصحيح ====================
-
-    bool preventDebugging() {
-        // 1. استدعاء Windows API
-        if (IsDebuggerPresent()) {
-            std::cerr << "[WARNING] Debugger detected!\n";
-            triggerTamperResponse();
+    bool QuarantineManager::EncryptFile(const std::wstring& sourcePath,
+        const std::wstring& destPath,
+        std::string& outHash) {
+        if (!m_hAesProvider || m_encryptionKey.empty()) {
             return false;
         }
 
-        // 2. إزالة أعلام التصحيح من PEB
-#ifndef _WIN64
-        __asm {
-            mov eax, fs: [0x30]      // PEB
-            mov byte ptr[eax + 2], 0 // BeingDebugged = false
+        // TODO: تنفيذ كامل للتشفير باستخدام BCrypt
+        // 1. Generate IV
+        // 2. Create AES key object
+        // 3. Read file in chunks
+        // 4. Encrypt with AES-256-GCM
+        // 5. Write IV + Ciphertext + Tag
+
+        // حالياً: نسخ مع Hash فقط (Stub)
+        try {
+            fs::copy_file(sourcePath, destPath, fs::copy_options::overwrite_existing);
+            outHash = CalculateSHA256(destPath);
+            return true;
         }
-#else
-// للـ x64: استخدام inline asm أو NtQueryInformationProcess
-#endif
-
-// 3. تسجيل معالج استثناء خاص
-        SetUnhandledExceptionFilter(exceptionHandler);
-
-        // 4. كشف التصحيح عن بُعد
-        checkRemoteDebugger();
-
-        // 5. كشف hardware breakpoints
-        checkHardwareBreakpoints();
-
-        return true;
-    }
-
-    void checkRemoteDebugger() {
-        // استخدام NtQueryInformationProcess
-        typedef NTSTATUS(WINAPI* pNtQueryInformationProcess)(
-            HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG
-            );
-
-        HMODULE ntdll = GetModuleHandleA("ntdll.dll");
-        auto NtQueryInformationProcess = (pNtQueryInformationProcess)
-            GetProcAddress(ntdll, "NtQueryInformationProcess");
-
-        if (NtQueryInformationProcess) {
-            HANDLE hDebugObject = NULL;
-            DWORD returnLength;
-
-            NTSTATUS status = NtQueryInformationProcess(
-                ownProcessHandle,
-                (PROCESSINFOCLASS)0x1E, // ProcessDebugObjectHandle
-                &hDebugObject,
-                sizeof(hDebugObject),
-                &returnLength
-            );
-
-            if (NT_SUCCESS(status) && hDebugObject != NULL) {
-                std::cerr << "[ALERT] Remote debugger detected!\n";
-                triggerTamperResponse();
-            }
-        }
-    }
-
-    void checkHardwareBreakpoints() {
-        CONTEXT ctx;
-        ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-
-        if (GetThreadContext(GetCurrentThread(), &ctx)) {
-            // التحقق من DR0-DR3 (registers نقاط التوقف)
-            if (ctx.Dr0 != 0 || ctx.Dr1 != 0 ||
-                ctx.Dr2 != 0 || ctx.Dr3 != 0) {
-                std::cerr << "[ALERT] Hardware breakpoint detected!\n";
-                triggerTamperResponse();
-            }
-        }
-    }
-
-    static LONG WINAPI exceptionHandler(EXCEPTION_POINTERS* pExceptionInfo) {
-        if (pExceptionInfo->ExceptionRecord->ExceptionCode ==
-            EXCEPTION_BREAKPOINT) {
-            std::cerr << "[CRITICAL] Breakpoint exception!\n";
-            // لا نسمح بالاستمرار
-            ExitProcess(0xDEAD);
-        }
-        return EXCEPTION_EXECUTE_HANDLER;
-    }
-
-    // ==================== حماية العملية ====================
-
-    bool protectProcess() {
-        // 1. Job Object - منع الخروج من العملية
-        hJobObject = CreateJobObjectA(NULL, "AI_Antivirus_Protected");
-        if (hJobObject) {
-            JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = {};
-            jeli.BasicLimitInformation.LimitFlags =
-                JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE |
-                JOB_OBJECT_LIMIT_BREAKAWAY_OK;
-
-            SetInformationJobObject(hJobObject,
-                JobObjectExtendedLimitInformation,
-                &jeli, sizeof(jeli));
-
-            AssignProcessToJobObject(hJobObject, ownProcessHandle);
-        }
-
-        // 2. حماية الملف من الحذف/التعديل
-        protectFiles();
-
-        // 3. منع إنشاء مقابض للكتابة
-        preventHandleAccess();
-
-        // 4. مراقبة العمليات المشبوهة
-        monitorSuspiciousProcesses();
-
-        return true;
-    }
-
-    void protectFiles() {
-        // حماية ملف البرنامج وملفات التكوين
-        std::vector<std::wstring> protectedFiles = {
-            processPath,
-            processPath + L".config",
-            // أضف الملفات الحرجة الأخرى
-        };
-
-        for (const auto& file : protectedFiles) {
-            if (fs::exists(file)) {
-                // تعيين صلاحيات للقراءة فقط
-                DWORD attrs = GetFileAttributesW(file.c_str());
-                SetFileAttributesW(file.c_str(),
-                    attrs | FILE_ATTRIBUTE_READONLY);
-            }
-        }
-    }
-
-    void preventHandleAccess() {
-        // تقليل الأذونات على مقبض العملية
-        // (يتطلب SetSecurityInfo - معقد)
-    }
-
-    // ==================== إخفاء البرنامج ====================
-
-    void hideFromTaskManager() {
-        // إخفاء من قائمة التطبيقات (ليس من العمليات)
-        // عبر SetWindowDisplayAffinity أو أسلوب آخر
-
-        // ملاحظة: الإخفاء الكامل يتطلب برمجة kernel-level (غير مستحسن)
-    }
-
-    // ==================== المراقبة المستمرة ====================
-
-    void startWatchdog() {
-        watchdogThread = std::thread([this]() {
-            while (isActive) {
-                // التحقق كل ثانية
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-
-                if (!performHealthCheck()) {
-                    std::cerr << "[CRITICAL] Health check failed!\n";
-                    triggerTamperResponse();
-                }
-
-                // كشف الـ debugger بشكل دوري
-                if (IsDebuggerPresent()) {
-                    triggerTamperResponse();
-                }
-            }
-            });
-    }
-
-    void startIntegrityMonitor() {
-        integrityThread = std::thread([this]() {
-            // حساب هاش الكود الأصلي
-            std::string originalHash = calculateCodeHash();
-
-            while (isActive) {
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-
-                std::string currentHash = calculateCodeHash();
-                if (currentHash != originalHash) {
-                    std::cerr << "[CRITICAL] Code integrity violation!\n";
-                    isTampered = true;
-                    triggerTamperResponse();
-                }
-            }
-            });
-    }
-
-    bool performHealthCheck() {
-        // التحقق من أن العملية لا تزال صحيحة
-        if (isTampered) return false;
-
-        // التحقق من عدم وجود حقن
-        if (detectCodeInjection()) {
+        catch (...) {
             return false;
         }
-
-        return true;
     }
 
-    bool detectCodeInjection() {
-        // فحص الوحدات المحملة بحثاً عن DLLs مشبوهة
-        HMODULE hMods[1024];
-        DWORD cbNeeded;
+    bool QuarantineManager::DecryptFile(const std::wstring& sourcePath,
+        const std::wstring& destPath) {
+        // TODO: فك التشفير
+        try {
+            fs::copy_file(sourcePath, destPath, fs::copy_options::overwrite_existing);
+            return true;
+        }
+        catch (...) {
+            return false;
+        }
+    }
 
-        if (EnumProcessModules(ownProcessHandle, hMods, sizeof(hMods), &cbNeeded)) {
-            for (unsigned int i = 0; i < (cbNeeded / sizeof(HMODULE)); i++) {
-                WCHAR szModName[MAX_PATH];
-                if (GetModuleFileNameExW(ownProcessHandle, hMods[i],
-                    szModName, sizeof(szModName) / sizeof(WCHAR))) {
-                    std::wstring modName(szModName);
+    QuarantineResult QuarantineManager::RestoreFile(const std::wstring& quarantineId,
+        const std::wstring& destinationPath) {
+        std::shared_lock<std::shared_mutex> lock(m_entriesMutex);
 
-                    // التحقق من DLLs غير موثقة
-                    if (!isModuleTrusted(modName)) {
-                        std::wcerr << L"[WARNING] Untrusted module: " << modName << L"\n";
-                        return true;
-                    }
-                }
-            }
+        auto it = m_entries.find(quarantineId);
+        if (it == m_entries.end()) {
+            return QuarantineResult::FILE_NOT_FOUND;
         }
 
+        const QuarantineEntry& entry = it->second;
+        std::wstring dest = destinationPath.empty() ? entry.originalPath : destinationPath;
+
+        // التحقق من عدم وجود ملف بنفس الاسم
+        if (fs::exists(dest)) {
+            dest += L".restored_" + GenerateUUID().substr(0, 8);
+        }
+
+        try {
+            // 1. إنشاء المجلد إذا لم يكن موجوداً
+            fs::create_directories(fs::path(dest).parent_path());
+
+            // 2. فك التشفير والضغط
+            std::wstring tempPath = entry.quarantinePath + L".restore_tmp";
+
+            if (entry.isEncrypted) {
+                if (!DecryptFile(entry.quarantinePath, tempPath)) {
+                    return QuarantineResult::ENCRYPTION_FAILED;
+                }
+            }
+            else {
+                tempPath = entry.quarantinePath;
+            }
+
+            if (entry.isCompressed) {
+                if (!DecompressFile(tempPath, dest)) {
+                    if (tempPath != entry.quarantinePath) fs::remove(tempPath);
+                    return QuarantineResult::UNKNOWN_ERROR;
+                }
+                if (tempPath != entry.quarantinePath) fs::remove(tempPath);
+            }
+            else {
+                fs::rename(tempPath, dest);
+            }
+
+            // 3. التحقق من الـ Hash
+            std::string restoredHash = CalculateSHA256(dest);
+            if (restoredHash != entry.originalHash) {
+                LogOperation("RESTORE", quarantineId, false, "Hash mismatch");
+                return QuarantineResult::UNKNOWN_ERROR;
+            }
+
+            // 4. إزالة من الحجر
+            RemoveEntryFromDatabase(quarantineId);
+            fs::remove(entry.quarantinePath);
+
+            {
+                std::unique_lock<std::shared_mutex> writeLock(m_entriesMutex);
+                m_entries.erase(quarantineId);
+            }
+
+            LogOperation("RESTORE", quarantineId, true);
+            return QuarantineResult::SUCCESS;
+
+        }
+        catch (const fs::filesystem_error& e) {
+            LogOperation("RESTORE", quarantineId, false, e.what());
+            return QuarantineResult::UNKNOWN_ERROR;
+        }
+    }
+
+    QuarantineResult QuarantineManager::DeletePermanently(const std::wstring& quarantineId,
+        bool secureDelete) {
+        std::shared_lock<std::shared_mutex> lock(m_entriesMutex);
+
+        auto it = m_entries.find(quarantineId);
+        if (it == m_entries.end()) {
+            return QuarantineResult::FILE_NOT_FOUND;
+        }
+
+        const QuarantineEntry& entry = it->second;
+
+        try {
+            // حذف آمن
+            if (secureDelete) {
+                SecureDelete(entry.quarantinePath);
+            }
+            else {
+                fs::remove(entry.quarantinePath);
+            }
+
+            // إزالة من قاعدة البيانات
+            RemoveEntryFromDatabase(quarantineId);
+
+            {
+                std::unique_lock<std::shared_mutex> writeLock(m_entriesMutex);
+                m_entries.erase(quarantineId);
+            }
+
+            LogOperation("DELETE", quarantineId, true);
+            return QuarantineResult::SUCCESS;
+
+        }
+        catch (const fs::filesystem_error& e) {
+            LogOperation("DELETE", quarantineId, false, e.what());
+            return QuarantineResult::UNKNOWN_ERROR;
+        }
+    }
+
+    std::vector<QuarantineEntry> QuarantineManager::GetQuarantinedFiles() {
+        std::shared_lock<std::shared_mutex> lock(m_entriesMutex);
+
+        std::vector<QuarantineEntry> result;
+        result.reserve(m_entries.size());
+
+        for (const auto& [id, entry] : m_entries) {
+            result.push_back(entry);
+        }
+
+        return result;
+    }
+
+    bool QuarantineManager::FindEntry(const std::wstring& quarantineId,
+        QuarantineEntry& entry) {
+        std::shared_lock<std::shared_mutex> lock(m_entriesMutex);
+
+        auto it = m_entries.find(quarantineId);
+        if (it != m_entries.end()) {
+            entry = it->second;
+            return true;
+        }
         return false;
     }
 
-    bool isModuleTrusted(const std::wstring& modulePath) {
-        // قائمة DLLs الموثوقة من النظام
-        static std::vector<std::wstring> trustedPaths = {
-            L"C:\\Windows\\System32\\",
-            L"C:\\Windows\\SysWOW64\\",
-            // أضف مسارات أخرى
-        };
+    bool QuarantineManager::FindEntryByOriginalPath(const std::wstring& originalPath,
+        QuarantineEntry& entry) {
+        std::shared_lock<std::shared_mutex> lock(m_entriesMutex);
 
-        for (const auto& path : trustedPaths) {
-            if (modulePath.find(path) == 0) {
+        for (const auto& [id, e] : m_entries) {
+            if (e.originalPath == originalPath) {
+                entry = e;
                 return true;
             }
         }
-
-        // السماح بـ DLLs في نفس مجلد البرنامج
-        std::wstring exeDir = processPath.substr(0,
-            processPath.find_last_of(L"\\") + 1);
-        if (modulePath.find(exeDir) == 0) {
-            return true;
-        }
-
         return false;
     }
 
-    // ==================== مراقبة العمليات المشبوهة ====================
+    bool QuarantineManager::SetupQuarantineDirectory() {
+        try {
+            // إنشاء المجلد
+            fs::create_directories(m_config.quarantineRoot);
 
-    void monitorSuspiciousProcesses() {
-        defenseThreads.emplace_back([this]() {
-            while (isActive) {
-                std::this_thread::sleep_for(std::chrono::seconds(3));
+            // إخفاء المجلد
+            SetFileAttributesW(m_config.quarantineRoot.c_str(), FILE_ATTRIBUTE_HIDDEN);
 
-                // البحث عن أدوات كشف البرمجيات الخبيثة الأخرى
-                // أو أدوات التحليل التي قد تستهدفنا
+            // تعيين ACLs
+            return SetDirectoryACLs(m_config.quarantineRoot);
+        }
+        catch (...) {
+            return false;
+        }
+    }
 
-                HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-                if (hSnapshot == INVALID_HANDLE_VALUE) continue;
+    bool QuarantineManager::SetDirectoryACLs(const std::wstring& path) {
+        // إزالة صلاحيات Users ومنحها فقط لـ SYSTEM والـ Admins
+        // TODO: تنفيذ كامل باستخدام SetSecurityDescriptorDacl
 
-                PROCESSENTRY32W pe32;
-                pe32.dwSize = sizeof(PROCESSENTRY32W);
+        PSECURITY_DESCRIPTOR pSD = NULL;
+        PACL pACL = NULL;
+        EXPLICIT_ACCESSW ea[2];
+        SID_IDENTIFIER_AUTHORITY SIDAuthNT = SECURITY_NT_AUTHORITY;
+        PSID pAdminSID = NULL;
+        PSID pSystemSID = NULL;
 
-                if (Process32FirstW(hSnapshot, &pe32)) {
-                    do {
-                        std::wstring procName(pe32.szExeFile);
-                        std::transform(procName.begin(), procName.end(),
-                            procName.begin(), ::tolower);
+        // إنشاء SIDs
+        AllocateAndInitializeSid(&SIDAuthNT, 2, SECURITY_BUILTIN_DOMAIN_RID,
+            DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &pAdminSID);
+        AllocateAndInitializeSid(&SIDAuthNT, 1, SECURITY_LOCAL_SYSTEM_RID,
+            0, 0, 0, 0, 0, 0, 0, &pSystemSID);
 
-                        // كشف أدوات التحليل
-                        std::vector<std::wstring> suspiciousTools = {
-                            L"procmon.exe",    // Process Monitor
-                            L"processhacker.exe",
-                            L"autoruns.exe",
-                            L"wireshark.exe",
-                            L"fiddler.exe",
-                            L"cheatengine.exe",
-                            L"x64dbg.exe",
-                            L"ollydbg.exe",
-                            L"idaq.exe",
-                            L"immunitydebugger.exe"
-                        };
+        // إعداد Explicit Access
+        ZeroMemory(&ea, 2 * sizeof(EXPLICIT_ACCESSW));
 
-                        for (const auto& tool : suspiciousTools) {
-                            if (procName.find(tool) != std::wstring::npos) {
-                                std::wcerr << L"[ALERT] Analysis tool detected: "
-                                    << procName << L"\n";
-                                // لا نتخذ إجراء فوري لكن نسجل
-                            }
-                        }
+        // Admin: Full Control
+        ea[0].grfAccessPermissions = GENERIC_ALL;
+        ea[0].grfAccessMode = SET_ACCESS;
+        ea[0].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+        ea[0].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        ea[0].Trustee.ptstrName = (LPWSTR)pAdminSID;
 
-                    } while (Process32NextW(hSnapshot, &pe32));
+        // System: Full Control
+        ea[1].grfAccessPermissions = GENERIC_ALL;
+        ea[1].grfAccessMode = SET_ACCESS;
+        ea[1].grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+        ea[1].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        ea[1].Trustee.ptstrName = (LPWSTR)pSystemSID;
+
+        // إنشاء ACL
+        DWORD dwRes = SetEntriesInAclW(2, ea, NULL, &pACL);
+        if (dwRes != ERROR_SUCCESS) {
+            if (pAdminSID) FreeSid(pAdminSID);
+            if (pSystemSID) FreeSid(pSystemSID);
+            return false;
+        }
+
+        // إنشاء Security Descriptor
+        pSD = (PSECURITY_DESCRIPTOR)LocalAlloc(LPTR, SECURITY_DESCRIPTOR_MIN_LENGTH);
+        if (!pSD || !InitializeSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION)) {
+            LocalFree(pSD);
+            LocalFree(pACL);
+            FreeSid(pAdminSID);
+            FreeSid(pSystemSID);
+            return false;
+        }
+
+        if (!SetSecurityDescriptorDacl(pSD, TRUE, pACL, FALSE)) {
+            LocalFree(pSD);
+            LocalFree(pACL);
+            FreeSid(pAdminSID);
+            FreeSid(pSystemSID);
+            return false;
+        }
+
+        // تطبيق على المجلد
+        BOOL result = SetFileSecurityW(path.c_str(), DACL_SECURITY_INFORMATION, pSD);
+
+        // تنظيف
+        LocalFree(pSD);
+        LocalFree(pACL);
+        FreeSid(pAdminSID);
+        FreeSid(pSystemSID);
+
+        return result == TRUE;
+    }
+
+    bool QuarantineManager::SecureDelete(const std::wstring& filePath, int passes) {
+        // الكتابة فوق الملف عدة مرات قبل الحذف
+        try {
+            // الحصول على حجم الملف
+            uint64_t size = fs::file_size(filePath);
+
+            // فتح للكتابة
+            HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_WRITE, 0, NULL,
+                OPEN_EXISTING, FILE_FLAG_WRITE_THROUGH, NULL);
+            if (hFile == INVALID_HANDLE_VALUE) return false;
+
+            // Patterns للكتابة فوق (Gutmann method مبسط)
+            const BYTE patterns[] = { 0x00, 0xFF, 0xAA, 0x55, 0x92, 0x49, 0x24 };
+
+            std::vector<BYTE> buffer(65536); // 64KB chunks
+
+            for (int pass = 0; pass < passes; ++pass) {
+                BYTE pattern = patterns[pass % sizeof(patterns)];
+                std::fill(buffer.begin(), buffer.end(), pattern);
+
+                SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
+
+                uint64_t written = 0;
+                while (written < size) {
+                    DWORD toWrite = static_cast<DWORD>(std::min<uint64_t>(buffer.size(),
+                        size - written));
+                    DWORD writtenNow = 0;
+                    if (!WriteFile(hFile, buffer.data(), toWrite, &writtenNow, NULL)) {
+                        CloseHandle(hFile);
+                        return false;
+                    }
+                    written += writtenNow;
                 }
-
-                CloseHandle(hSnapshot);
+                FlushFileBuffers(hFile);
             }
-            });
-    }
 
-    // ==================== أدوات مساعدة ====================
+            CloseHandle(hFile);
 
-    std::string calculateCodeHash() {
-        // حساب هاش قسم الكود للتحقق من السلامة
-        HMODULE hMod = GetModuleHandle(NULL);
+            // إعادة تسمية عدة مرات قبل الحذف
+            std::wstring tempPath = filePath;
+            for (int i = 0; i < 3; ++i) {
+                std::wstring newPath = tempPath + L".del";
+                MoveFileW(tempPath.c_str(), newPath.c_str());
+                tempPath = newPath;
+            }
 
-        MODULEINFO modInfo;
-        if (!GetModuleInformation(ownProcessHandle, hMod, &modInfo, sizeof(modInfo))) {
-            return "";
+            return DeleteFileW(tempPath.c_str()) == TRUE;
         }
-
-        // قراءة أول 4KB من الكود
-        BYTE* codeStart = (BYTE*)modInfo.EntryPoint;
-        std::vector<BYTE> code(codeStart, codeStart + 4096);
-
-        // هاش بسيط (في الإنتاج استخدم SHA-256)
-        size_t hash = 0;
-        for (auto b : code) {
-            hash = hash * 31 + b;
-        }
-
-        return std::to_string(hash);
-    }
-
-    void initializeDefenses() {
-        // إضافة فحوصات نزاهة مخصصة
-        integrityChecks.push_back([this]() {
-            return !IsDebuggerPresent();
-            });
-
-        // إضافة ردود فعل على التلاعب
-        tamperResponses.push_back([this]() {
-            // الرد 1: تسجيل
-            logSecurityEvent("TAMPER_DETECTED");
-
-            // الرد 2: إعلام المستخدم
-            MessageBoxA(NULL,
-                "Security violation detected!\nThe application will now close.",
-                "AI Antivirus - Security Alert",
-                MB_OK | MB_ICONERROR);
-
-            // الرد 3: إنهاء العملية
-            ExitProcess(0xDEADBEEF);
-            });
-    }
-
-    void triggerTamperResponse() {
-        for (const auto& response : tamperResponses) {
-            response();
+        catch (...) {
+            return false;
         }
     }
 
-    void logSecurityEvent(const std::string& event) {
-        std::string logPath = "C:\\ProgramData\\AI_Antivirus\\security.log";
+    std::wstring QuarantineManager::GenerateUUID() {
+        UUID uuid;
+        UuidCreate(&uuid);
 
-        std::ofstream log(logPath, std::ios::app);
+        WCHAR* wszUuid = NULL;
+        UuidToStringW(&uuid, (RPC_WSTR*)&wszUuid);
+
+        std::wstring result(wszUuid);
+        RpcStringFreeW((RPC_WSTR*)&wszUuid);
+
+        // إزالة الأقواس والشرطات
+        result.erase(std::remove(result.begin(), result.end(), L'-'), result.end());
+        result.erase(std::remove(result.begin(), result.end(), L'{'), result.end());
+        result.erase(std::remove(result.begin(), result.end(), L'}'), result.end());
+
+        return result;
+    }
+
+    std::string QuarantineManager::CalculateSHA256(const std::wstring& filePath) {
+        // TODO: استخدام نفس دالة FileScanner
+        // Stub مؤقت
+        return "stub_hash";
+    }
+
+    std::wstring QuarantineManager::GenerateQuarantinePath(const std::wstring& originalName) {
+        std::wstringstream ss;
+        ss << m_config.quarantineRoot
+            << GenerateUUID()
+            << L"_"
+            << fs::path(originalName).stem().wstring()
+            << L".quarantine";
+        return ss.str();
+    }
+
+    bool QuarantineManager::CheckDiskSpace(uint64_t requiredBytes) {
+        ULARGE_INTEGER freeBytesAvailable;
+        if (GetDiskFreeSpaceExW(m_config.quarantineRoot.c_str(),
+            &freeBytesAvailable, NULL, NULL)) {
+            return freeBytesAvailable.QuadPart >= requiredBytes;
+        }
+        return false;
+    }
+
+    // ==================== Database Stubs ====================
+
+    bool QuarantineManager::LoadEntriesFromDatabase() {
+        // TODO: تحميل من SQLite
+        // CREATE TABLE quarantine (
+        //   id TEXT PRIMARY KEY,
+        //   original_path TEXT,
+        //   file_name TEXT,
+        //   threat_name TEXT,
+        //   detection_time INTEGER,
+        //   ...
+        // );
+        return true;
+    }
+
+    bool QuarantineManager::SaveEntryToDatabase(const QuarantineEntry& entry) {
+        // TODO: INSERT INTO quarantine
+        return true;
+    }
+
+    bool QuarantineManager::RemoveEntryFromDatabase(const std::wstring& quarantineId) {
+        // TODO: DELETE FROM quarantine WHERE id = ?
+        return true;
+    }
+
+    bool QuarantineManager::UpdateEntryInDatabase(const QuarantineEntry& entry) {
+        // TODO: UPDATE quarantine SET ...
+        return true;
+    }
+
+    // ==================== ADS (Alternate Data Streams) ====================
+
+    bool QuarantineManager::WriteMetadataToADS(const std::wstring& filePath,
+        const QuarantineEntry& entry) {
+        std::wstring streamPath = filePath + L":AIAV_Meta";
+
+        // Serialize entry to JSON or binary
+        std::stringstream ss;
+        ss << entry.quarantineId.length() << "|"
+            << std::string(entry.originalPath.begin(), entry.originalPath.end()) << "|"
+            << entry.threatName << "|"
+            << entry.originalHash;
+
+        std::string data = ss.str();
+
+        HANDLE hStream = CreateFileW(streamPath.c_str(), GENERIC_WRITE, 0, NULL,
+            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hStream == INVALID_HANDLE_VALUE) return false;
+
+        DWORD written;
+        BOOL result = WriteFile(hStream, data.data(), static_cast<DWORD>(data.size()),
+            &written, NULL);
+        CloseHandle(hStream);
+
+        return result == TRUE;
+    }
+
+    bool QuarantineManager::ReadMetadataFromADS(const std::wstring& filePath,
+        QuarantineEntry& entry) {
+        std::wstring streamPath = filePath + L":AIAV_Meta";
+
+        HANDLE hStream = CreateFileW(streamPath.c_str(), GENERIC_READ, FILE_SHARE_READ,
+            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hStream == INVALID_HANDLE_VALUE) return false;
+
+        char buffer[4096];
+        DWORD read;
+        if (ReadFile(hStream, buffer, sizeof(buffer), &read, NULL) && read > 0) {
+            // Parse (TODO: proper parsing)
+            buffer[read] = '\0';
+            CloseHandle(hStream);
+            return true;
+        }
+
+        CloseHandle(hStream);
+        return false;
+    }
+
+    // ==================== Maintenance ====================
+
+    size_t QuarantineManager::CleanupOldFiles() {
         auto now = std::chrono::system_clock::now();
-        auto time = std::chrono::system_clock::to_time_t(now);
+        std::vector<std::wstring> toDelete;
 
-        log << std::ctime(&time);
-        log << "Event: " << event << "\n";
-        log << "PID: " << ownProcessId << "\n";
-        log << "------------------------\n";
-    }
+        {
+            std::shared_lock<std::shared_mutex> lock(m_entriesMutex);
+            for (const auto& [id, entry] : m_entries) {
+                auto age = std::chrono::duration_cast<std::chrono::hours>(
+                    now - entry.quarantineTime).count() / 24;
 
-    // ==================== واجهة برمجة التطبيقات العامة ====================
-
-public:
-    ProtectionStatus getStatus() const {
-        ProtectionStatus status;
-        status.isProtected = isActive;
-        status.isDebuggerAttached = IsDebuggerPresent();
-        status.isRunningElevated = false; // يتم التحقق لاحقاً
-
-        // التحقق من التصحيح الافتراضي
-        BOOL isVirtual = FALSE;
-        IsProcessorFeaturePresent(PF_VIRT_FIRMWARE_ENABLED);
-        status.isVirtualized = isVirtual;
-
-        status.startTime = std::chrono::system_clock::now();
-        status.activeDefenses = {
-            "Memory Protection",
-            "Anti-Debugging",
-            "Process Monitoring",
-            "Integrity Checks",
-            "Code Injection Detection"
-        };
-
-        return status;
-    }
-
-    void displayStatus() const {
-        auto status = getStatus();
-
-        std::cout << "\n=== SELF-PROTECTION STATUS ===\n";
-        std::cout << "Status: " << (status.isProtected ? "🟢 ACTIVE" : "🔴 INACTIVE") << "\n";
-        std::cout << "Debugger: " << (status.isDebuggerAttached ? "⚠️  DETECTED" : "✅ Clear") << "\n";
-        std::cout << "Virtualized: " << (status.isVirtualized ? "⚠️  YES" : "✅ No") << "\n";
-        std::cout << "Active Defenses (" << status.activeDefenses.size() << "):\n";
-        for (const auto& defense : status.activeDefenses) {
-            std::cout << "  • " << defense << "\n";
+                if (age > m_config.retentionDays) {
+                    toDelete.push_back(id);
+                }
+            }
         }
-        std::cout << "===============================\n";
+
+        for (const auto& id : toDelete) {
+            DeletePermanently(id, false);
+        }
+
+        return toDelete.size();
     }
 
-    bool isProtectionActive() const {
-        return isActive;
+    QuarantineStats QuarantineManager::GetStatistics() const {
+        std::shared_lock<std::shared_mutex> lock(m_entriesMutex);
+
+        QuarantineStats stats{};
+        stats.totalFiles = m_entries.size();
+
+        for (const auto& [id, entry] : m_entries) {
+            stats.totalSizeBytes += entry.originalFileSize;
+            if (entry.isEncrypted) stats.encryptedFiles++;
+            if (entry.isCompressed) stats.compressedFiles++;
+
+            if (stats.oldestEntry == std::chrono::system_clock::time_point{} ||
+                entry.quarantineTime < stats.oldestEntry) {
+                stats.oldestEntry = entry.quarantineTime;
+            }
+        }
+
+        return stats;
     }
 
-    // كشف التلاعب يدوياً
-    bool verifyIntegrity() {
-        return performHealthCheck();
-    }
-};
-
-// ==================== نقطة الاختبار ====================
-
-#ifdef TEST_PROTECTION
-int main() {
-    std::cout << "AI Antivirus - Self-Protection Test\n\n";
-
-    SelfProtection protection;
-
-    if (!protection.activate()) {
-        std::cerr << "Failed to activate protection\n";
-        return 1;
+    void QuarantineManager::LogOperation(const std::string& operation,
+        const std::wstring& fileId,
+        bool success,
+        const std::string& details) {
+        // TODO: كتابة في Windows Event Log أو ملف Log
+        // EventWrite(...) أو std::ofstream
     }
 
-    std::cout << "\nProtection active for 30 seconds...\n";
-    std::cout << "Try attaching a debugger or modifying memory!\n\n";
-
-    Sleep(30000);
-
-    protection.deactivate();
-
-    return 0;
-}
-#endif
+} // namespace AIAntivirus

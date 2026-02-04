@@ -1,725 +1,1076 @@
-// ProcessAnalyzer.cpp - Core Module
-// محلل العمليات وكشف السلوك الضار
+﻿/**
+ * ProcessAnalyzer.cpp
+ *
+ * محلل العمليات - Process Behavior Analyzer
+ *
+ * المسؤوليات:
+ * - تحليل العمليات الجارية في النظام
+ * - فحص السلوكيات المشبوهة (API Hooking, Injection, etc.)
+ * - تحليل الـ Modules/DLLs المحملة داخل العملية
+ * - تقييم درجة الخطورة باستخدام الذكاء الاصطناعي
+ * - اكتشاف تقنيات التهديدات المتقدمة (MITRE ATT&CK)
+ *
+ * التقنيات المستخدمة:
+ * - Windows Toolhelp32 API لالتقاط لقطات العمليات
+ * - Memory Analysis لـ Injected Code
+ * - ETW (Event Tracing for Windows) للأحداث الأمنية
+ * - Handle Enumeration للكشف عن Process Hollowing
+ *
+ * متطلبات: C++17, Windows 10+, صلاحيات Administrator لبعض الميزات
+ */
 
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
-#include <set>
-#include <thread>
-#include <mutex>
-#include <chrono>
-#include <sstream>
-#include <iomanip>
-#include <algorithm>
 #include <windows.h>
 #include <tlhelp32.h>
 #include <psapi.h>
 #include <winternl.h>
-#include <iphlpapi.h>
-#include <netioapi.h>
+#include <string>
+#include <vector>
+#include <map>
+#include <set>
+#include <memory>
+#include <algorithm>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
+#include <numeric>
+#include <functional>
 
-// ربط مكتبات الشبكة
-#pragma comment(lib, "iphlpapi.lib")
+ // TODO: تضمين الموديولات الأخرى عند ربطها
+ // #include "FeatureExtractor.h"
+ // #include "../AI/AIDetector.h"
+
 #pragma comment(lib, "psapi.lib")
+#pragma comment(lib, "ntdll.lib") // For NtQueryInformationProcess
 
-// ==================== هيكل معلومات العملية ====================
+namespace AIAntivirus {
 
-struct ProcessInfo {
-    DWORD pid;
-    DWORD parentPid;
-    std::wstring name;
-    std::wstring path;
-    std::wstring commandLine;
-    SIZE_T memoryUsage;
-    SIZE_T virtualMemory;
-    DWORD threads;
-    DWORD handles;
-    std::chrono::system_clock::time_point startTime;
-    bool isSigned;
-    bool isSystem;
-    bool isSuspicious;
-    std::vector<std::string> loadedModules;
-    std::vector<std::string> networkConnections;
-    float riskScore;
-};
+    // ==================== تعريفات الأنواع ====================
 
-// ==================== هيكل السلوك المشبوه ====================
-
-struct SuspiciousBehavior {
-    enum class Type {
-        PROCESS_INJECTION,      // حقن العمليات
-        MEMORY_MANIPULATION,    // التلاعب بالذاكرة
-        PERSISTENCE_MECHANISM,  // آليات البقاء
-        PRIVILEGE_ESCALATION,   // رفع الصلاحيات
-        NETWORK_SUSPICIOUS,     // شبكة مشبوهة
-        CODE_INJECTION,         // حقن كود
-        ANTI_DEBUGGING,         // مكافحة التصحيح
-        RANSOMWARE_PATTERN,     // نمط فدية
-        KEYLOGGER_PATTERN,      // نمط التجسس
-        ROOTKIT_BEHAVIOR        // سلوك روتكيت
+    /**
+     * تقنيات MITRE ATT&CK المدعومة
+     */
+    enum class AttackTechnique {
+        UNKNOWN,
+        PROCESS_INJECTION,          // T1055
+        PROCESS_HOLLOWING,          // T1055.012
+        DLL_INJECTION,              // T1055.001
+        API_HOOKING,                // T1056.004
+        BYPASS_UAC,                 // T1548.002
+        PRIVILEGE_ESCALATION,       // various
+        DEFENSE_EVASION,            // various
+        PERSISTENCE,                // various
+        CREDENTIAL_DUMPING,         // T1003
+        LATERAL_MOVEMENT            // various
     };
 
-    Type type;
-    DWORD pid;
-    std::string description;
-    std::chrono::system_clock::time_point timestamp;
-    int severity; // 1-10
-};
-
-// ==================== محلل العمليات الرئيسي ====================
-
-class ProcessAnalyzer {
-private:
-    std::map<DWORD, ProcessInfo> processCache;
-    std::vector<SuspiciousBehavior> detectedBehaviors;
-    std::mutex cacheMutex;
-    std::mutex behaviorMutex;
-    std::atomic<bool> isMonitoring{ false };
-    std::thread monitorThread;
-
-    // قواعد الكشف عن السلوك الضار
-    struct DetectionRule {
-        std::string name;
-        std::function<bool(const ProcessInfo&)> check;
-        int severity;
-        SuspiciousBehavior::Type type;
+    /**
+     * معلومات Module/DLL
+     */
+    struct ModuleInfo {
+        std::wstring name;
+        std::wstring fullPath;
+        PVOID baseAddress;
+        DWORD size;
+        bool isSigned;
+        std::string signerName;
+        std::string hash;           // SHA-256
+        bool isSuspicious;
+        std::string threatInfo;
     };
-    std::vector<DetectionRule> rules;
 
-public:
-    ProcessAnalyzer() {
-        std::cout << "[INIT] ProcessAnalyzer Engine Loading...\n";
-        initializeDetectionRules();
-        refreshProcessList();
+    /**
+     * معلومات الذاكرة (Memory Region)
+     */
+    struct MemoryRegion {
+        PVOID baseAddress;
+        SIZE_T size;
+        DWORD state;                // MEM_COMMIT, MEM_RESERVE, MEM_FREE
+        DWORD protect;              // PAGE_EXECUTE, PAGE_READWRITE, etc.
+        DWORD type;                 // MEM_PRIVATE, MEM_MAPPED, MEM_IMAGE
+        bool isExecutable;
+        bool isWritable;
+        std::string entropy;        // High entropy = suspicious
+    };
+
+    /**
+     * سلوك عملية واحدة
+     */
+    struct ProcessBehavior {
+        std::vector<std::wstring> createdProcesses;
+        std::vector<std::wstring> loadedModules;
+        std::vector<std::wstring> networkConnections;
+        std::vector<std::wstring> modifiedFiles;
+        std::vector<std::wstring> registryChanges;
+        bool attemptedEscalation;
+        bool injectedCode;
+        bool hookedAPI;
+    };
+
+    /**
+     * تقرير تحليل العملية
+     */
+    struct ProcessAnalysisReport {
+        DWORD processId;
+        std::wstring processName;
+        std::wstring executablePath;
+        std::wstring commandLine;
+        DWORD parentProcessId;
+        std::wstring parentProcessName;
+
+        // تقييم الخطورة
+        float threatScore;              // 0.0 - 1.0
+        bool isMalicious;
+        std::vector<AttackTechnique> detectedTechniques;
+        std::vector<std::string> indicators;
+
+        // تفاصيل فنية
+        std::vector<ModuleInfo> loadedModules;
+        std::vector<MemoryRegion> memoryRegions;
+        ProcessBehavior behavior;
+
+        // معلومات النظام
+        std::chrono::system_clock::time_point startTime;
+        SIZE_T memoryUsage;
+        DWORD threadCount;
+        bool isElevated;
+        bool isCriticalSystemProcess;
+    };
+
+    /**
+     * معلومات Thread
+     */
+    struct ThreadInfo {
+        DWORD threadId;
+        PVOID startAddress;
+        std::wstring moduleName;        // أي module يبدأ منه
+        bool isSuspended;
+        DWORD priority;
+    };
+
+    /**
+     * إعدادات المحلل
+     */
+    struct AnalyzerConfig {
+        bool analyzeMemory = true;          // تحليل الذاكرة
+        bool checkDigitalSignatures = true; // التحقق من التوقيعات
+        bool detectInjection = true;        // اكتشاف الـ Injection
+        bool useAI = true;                  // استخدام الذكاء الاصطناعي
+        float threatThreshold = 0.7f;       // عتبة التهديد
+        int maxAnalysisTimeMs = 5000;       // أقصى وقت للتحليل
+    };
+
+    // ==================== الفئة الرئيسية: ProcessAnalyzer ====================
+
+    class ProcessAnalyzer {
+    public:
+        ProcessAnalyzer();
+        ~ProcessAnalyzer();
+
+        // منع النسخ
+        ProcessAnalyzer(const ProcessAnalyzer&) = delete;
+        ProcessAnalyzer& operator=(const ProcessAnalyzer&) = delete;
+
+        // ==================== واجهة التحليل ====================
+
+        /**
+         * تحليل عملية واحدة بالتفصيل
+         */
+        bool AnalyzeProcess(DWORD processId, ProcessAnalysisReport& report);
+
+        /**
+         * تحليل جميع العمليات في النظام
+         */
+        std::vector<ProcessAnalysisReport> AnalyzeAllProcesses();
+
+        /**
+         * تحليل سريع (خفيف) للعملية
+         */
+        bool QuickAnalyze(DWORD processId, ProcessAnalysisReport& report);
+
+        /**
+         * مراقبة عملية معينة بشكل مستمر
+         */
+        bool StartMonitoringProcess(DWORD processId);
+        void StopMonitoringProcess(DWORD processId);
+
+        /**
+         * التحقق من وجود Injection في عملية
+         */
+        bool DetectInjection(DWORD processId, std::vector<std::string>& details);
+
+        /**
+         * فحص Process Hollowing
+         */
+        bool DetectProcessHollowing(DWORD processId);
+
+        /**
+         * اكتشاف API Hooking
+         */
+        bool DetectAPIHooking(DWORD processId, std::map<std::string, bool>& hookedModules);
+
+        // ==================== واجهة التكوين ====================
+
+        void SetConfig(const AnalyzerConfig& config) { m_config = config; }
+        AnalyzerConfig GetConfig() const { return m_config; }
+
+        /**
+         * الحصول على قائمة العمليات المشبوهة فقط
+         */
+        std::vector<ProcessAnalysisReport> GetSuspiciousProcesses();
+
+        /**
+         * إضافة عملية للقائمة البيضاء
+         */
+        void WhitelistProcess(const std::wstring& processName);
+
+        /**
+         * إضافة Module للقائمة السوداء
+         */
+        void BlacklistModule(const std::string& moduleHash);
+
+    private:
+        // ==================== الأعضاء الخاصة ====================
+
+        AnalyzerConfig m_config;
+
+        // قائمة العمليات المراقبة
+        std::map<DWORD, std::unique_ptr<std::thread>> m_monitoredProcesses;
+        std::mutex m_monitorMutex;
+
+        // Whitelist/Blacklist
+        std::set<std::wstring> m_whitelistedProcesses;
+        std::set<std::string> m_blacklistedModules;
+        std::shared_mutex m_listMutex;
+
+        // Cache للنتائج
+        std::map<DWORD, ProcessAnalysisReport> m_cache;
+        std::mutex m_cacheMutex;
+
+        // ==================== وظائف التحليل الداخلية ====================
+
+        /**
+         * الحصول على معلومات أساسية عن العملية
+         */
+        bool GetBasicProcessInfo(DWORD processId, ProcessAnalysisReport& report);
+
+        /**
+         * استخراج سطر الأوامر
+         */
+        bool GetCommandLine(DWORD processId, std::wstring& cmdLine);
+
+        /**
+         * الحصول على العملية الأب
+         */
+        bool GetParentProcessId(DWORD processId, DWORD& parentId);
+
+        /**
+         * استخراج الـ Modules المحملة
+         */
+        bool EnumerateModules(DWORD processId, std::vector<ModuleInfo>& modules);
+
+        /**
+         * فحص Module واحد
+         */
+        void AnalyzeModule(ModuleInfo& module);
+
+        /**
+         * استخراج مناطق الذاكرة
+         */
+        bool EnumerateMemoryRegions(DWORD processId, std::vector<MemoryRegion>& regions);
+
+        /**
+         * حساب Entropy لمنطقة ذاكرة
+         */
+        float CalculateMemoryEntropy(HANDLE hProcess, PVOID address, SIZE_T size);
+
+        /**
+         * اكتشاف الذاكرة القابلة للتنفيذ والمشبوهة
+         */
+        bool DetectExecutableMemory(HANDLE hProcess, const std::vector<MemoryRegion>& regions,
+            std::vector<std::string>& findings);
+
+        /**
+         * تحليل Threads
+         */
+        bool AnalyzeThreads(DWORD processId, std::vector<ThreadInfo>& threads);
+
+        /**
+         * تقييم الخطورة باستخدام Heuristics
+         */
+        float CalculateHeuristicScore(const ProcessAnalysisReport& report);
+
+        /**
+         * TODO: تقييم الخطورة بالذكاء الاصطناعي
+         */
+        float CalculateAIScore(const ProcessAnalysisReport& report);
+
+        /**
+         * فحص سلوكيات مشبوهة محددة
+         */
+        void CheckSuspiciousBehaviors(ProcessAnalysisReport& report);
+
+        /**
+         * التحقق من أن العملية نظامية حرجة
+         */
+        bool IsCriticalSystemProcess(const std::wstring& processName);
+
+        /**
+         * التحقق من القائمة البيضاء
+         */
+        bool IsWhitelisted(const std::wstring& processName);
+
+        /**
+         * التحقق من القائمة السوداء
+         */
+        bool IsBlacklisted(const std::string& moduleHash);
+
+        /**
+         * Thread مراقبة مستمرة لعملية
+         */
+        void MonitorThreadFunc(DWORD processId);
+
+        // ==================== وظائف مساعدة ====================
+
+        static std::wstring GetFileNameFromPath(const std::wstring& path);
+        static std::string BytesToHexString(const BYTE* data, size_t len);
+        static bool ReadProcessMemorySafe(HANDLE hProcess, LPCVOID address,
+            LPVOID buffer, SIZE_T size);
+    };
+
+    // ==================== التنفيذ (Implementation) ====================
+
+    ProcessAnalyzer::ProcessAnalyzer() {
+        // إضافة العمليات النظامية للقائمة البيضاء الافتراضية
+        const std::vector<std::wstring> systemProcesses = {
+            L"System", L"Registry", L"smss.exe", L"csrss.exe", L"wininit.exe",
+            L"services.exe", L"lsass.exe", L"svchost.exe", L"explorer.exe",
+            L"taskhostw.exe", L"dwm.exe", L"fontdrvhost.exe"
+        };
+
+        for (const auto& proc : systemProcesses) {
+            WhitelistProcess(proc);
+        }
     }
 
-    ~ProcessAnalyzer() {
-        stopMonitoring();
-        std::cout << "[SHUTDOWN] ProcessAnalyzer Engine Stopped\n";
+    ProcessAnalyzer::~ProcessAnalyzer() {
+        // إيقاف جميع المراقبات
+        {
+            std::lock_guard<std::mutex> lock(m_monitorMutex);
+            for (auto& [pid, thread] : m_monitoredProcesses) {
+                if (thread && thread->joinable()) {
+                    // TODO: إشارة إيقاف بدلاً من detachment
+                    thread->detach();
+                }
+            }
+        }
     }
 
-    // ==================== جمع المعلومات ====================
-
-    void refreshProcessList() {
-        HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if (hSnapshot == INVALID_HANDLE_VALUE) {
-            std::cerr << "[ERROR] Failed to create process snapshot\n";
-            return;
+    bool ProcessAnalyzer::AnalyzeProcess(DWORD processId, ProcessAnalysisReport& report) {
+        if (processId == 0 || processId == 4) { // Idle أو System
+            return false;
         }
 
-        PROCESSENTRY32W pe32;
-        pe32.dwSize = sizeof(PROCESSENTRY32W);
+        auto startTime = std::chrono::steady_clock::now();
 
-        if (Process32FirstW(hSnapshot, &pe32)) {
-            std::lock_guard<std::mutex> lock(cacheMutex);
-            processCache.clear();
+        // 1. المعلومات الأساسية
+        if (!GetBasicProcessInfo(processId, report)) {
+            return false;
+        }
 
+        report.processId = processId;
+
+        // التحقق من القائمة البيضاء
+        if (IsWhitelisted(report.processName) && !m_config.useAI) {
+            report.threatScore = 0.0f;
+            report.isMalicious = false;
+            return true;
+        }
+
+        // 2. Modules
+        if (!EnumerateModules(processId, report.loadedModules)) {
+            // ليس خطأً fatal - استمر
+        }
+
+        // 3. Memory Analysis
+        if (m_config.analyzeMemory && processId != GetCurrentProcessId()) {
+            EnumerateMemoryRegions(processId, report.memoryRegions);
+
+            // اكتشاف Injection
+            if (m_config.detectInjection) {
+                std::vector<std::string> injectionDetails;
+                if (DetectInjection(processId, injectionDetails)) {
+                    report.detectedTechniques.push_back(AttackTechnique::PROCESS_INJECTION);
+                    report.indicators.insert(report.indicators.end(),
+                        injectionDetails.begin(), injectionDetails.end());
+                }
+            }
+        }
+
+        // 4. Thread Analysis
+        std::vector<ThreadInfo> threads;
+        if (AnalyzeThreads(processId, threads)) {
+            report.threadCount = static_cast<DWORD>(threads.size());
+
+            // التحقق من Threads مشبوهة (Started in suspicious memory)
+            for (const auto& thread : threads) {
+                if (thread.moduleName.empty() || thread.moduleName == L"UNKNOWN") {
+                    report.behavior.injectedCode = true;
+                    report.indicators.push_back("Thread with unknown start address: " +
+                        std::to_string(thread.threadId));
+                }
+            }
+        }
+
+        // 5. Heuristic Analysis
+        float heuristicScore = CalculateHeuristicScore(report);
+
+        // 6. AI Analysis (TODO)
+        float aiScore = 0.0f;
+        if (m_config.useAI) {
+            aiScore = CalculateAIScore(report);
+        }
+
+        // 7. Final Score
+        report.threatScore = std::max(heuristicScore, aiScore);
+        report.isMalicious = (report.threatScore >= m_config.threatThreshold);
+
+        // 8. Check Specific Techniques
+        CheckSuspiciousBehaviors(report);
+
+        // تحديث الـ Cache
+        {
+            std::lock_guard<std::mutex> lock(m_cacheMutex);
+            m_cache[processId] = report;
+        }
+
+        // التحقق من وقت التنفيذ
+        auto duration = std::chrono::steady_clock::now() - startTime;
+        if (duration > std::chrono::milliseconds(m_config.maxAnalysisTimeMs)) {
+            report.indicators.push_back("Analysis timeout - partial results");
+        }
+
+        return true;
+    }
+
+    bool ProcessAnalyzer::QuickAnalyze(DWORD processId, ProcessAnalysisReport& report) {
+        // نسخة خفيفة: فقط Basic Info + Module Count + Signature Check
+
+        if (!GetBasicProcessInfo(processId, report)) {
+            return false;
+        }
+
+        report.processId = processId;
+
+        // فحص سريع للـ Modules (فقط الأعداد والتوقيعات)
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+            FALSE, processId);
+        if (hProcess) {
+            HMODULE hMods[1024];
+            DWORD cbNeeded;
+
+            if (EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbNeeded)) {
+                for (unsigned int i = 0; i < (cbNeeded / sizeof(HMODULE)); i++) {
+                    ModuleInfo mod;
+                    wchar_t szModName[MAX_PATH];
+
+                    if (GetModuleFileNameExW(hProcess, hMods[i], szModName,
+                        sizeof(szModName) / sizeof(wchar_t))) {
+                        mod.name = GetFileNameFromPath(szModName);
+                        mod.fullPath = szModName;
+                        mod.baseAddress = hMods[i];
+
+                        // فقط التوقيع للملفات غير النظامية
+                        if (m_config.checkDigitalSignatures) {
+                            // TODO: VerifyDigitalSignature
+                        }
+
+                        report.loadedModules.push_back(mod);
+                    }
+                }
+            }
+
+            CloseHandle(hProcess);
+        }
+
+        // تقييم سريع
+        report.threatScore = CalculateHeuristicScore(report);
+        report.isMalicious = (report.threatScore >= m_config.threatThreshold);
+
+        return true;
+    }
+
+    std::vector<ProcessAnalysisReport> ProcessAnalyzer::AnalyzeAllProcesses() {
+        std::vector<ProcessAnalysisReport> reports;
+
+        HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (hSnapshot == INVALID_HANDLE_VALUE) {
+            return reports;
+        }
+
+        PROCESSENTRY32W pe;
+        pe.dwSize = sizeof(PROCESSENTRY32W);
+
+        if (Process32FirstW(hSnapshot, &pe)) {
             do {
-                ProcessInfo info;
-                info.pid = pe32.th32ProcessID;
-                info.parentPid = pe32.th32ParentProcessID;
-                info.name = pe32.szExeFile;
-                info.riskScore = 0.0f;
-                info.isSuspicious = false;
-                info.isSystem = false;
-
-                // تجاهل System Idle Process
-                if (info.pid == 0) continue;
-
-                // الحصول على معلومات إضافية
-                getDetailedProcessInfo(info);
-
-                // تحليل السلوك
-                analyzeProcessBehavior(info);
-
-                processCache[info.pid] = info;
-
-            } while (Process32NextW(hSnapshot, &pe32));
+                ProcessAnalysisReport report;
+                if (QuickAnalyze(pe.th32ProcessID, report)) {
+                    reports.push_back(report);
+                }
+            } while (Process32NextW(hSnapshot, &pe));
         }
 
         CloseHandle(hSnapshot);
+        return reports;
     }
 
-    void getDetailedProcessInfo(ProcessInfo& info) {
-        HANDLE hProcess = OpenProcess(
-            PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
-            FALSE, info.pid
-        );
-
-        if (hProcess == NULL) {
-            // لا يمكن الوصول (نظام أو محمي)
-            info.isSystem = true;
-            return;
+    bool ProcessAnalyzer::GetBasicProcessInfo(DWORD processId, ProcessAnalysisReport& report) {
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+            FALSE, processId);
+        if (!hProcess) {
+            return false;
         }
 
-        // المسار الكامل
-        WCHAR path[MAX_PATH];
-        if (GetModuleFileNameExW(hProcess, NULL, path, MAX_PATH)) {
-            info.path = path;
+        // اسم الملف التنفيذي
+        wchar_t processPath[MAX_PATH];
+        DWORD size = MAX_PATH;
+        if (QueryFullProcessImageNameW(hProcess, 0, processPath, &size)) {
+            report.executablePath = processPath;
+            report.processName = GetFileNameFromPath(processPath);
+        }
+        else {
+            report.processName = L"Unknown";
+        }
+
+        // سطر الأوامر
+        GetCommandLine(processId, report.commandLine);
+
+        // العملية الأب
+        GetParentProcessId(processId, report.parentProcessId);
+
+        if (report.parentProcessId != 0) {
+            HANDLE hParent = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, report.parentProcessId);
+            if (hParent) {
+                wchar_t parentPath[MAX_PATH];
+                DWORD parentSize = MAX_PATH;
+                if (QueryFullProcessImageNameW(hParent, 0, parentPath, &parentSize)) {
+                    report.parentProcessName = GetFileNameFromPath(parentPath);
+                }
+                CloseHandle(hParent);
+            }
         }
 
         // استخدام الذاكرة
         PROCESS_MEMORY_COUNTERS pmc;
         if (GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
-            info.memoryUsage = pmc.WorkingSetSize;
-            info.virtualMemory = pmc.PagefileUsage;
+            report.memoryUsage = pmc.WorkingSetSize;
         }
 
-        // عدد المقابض والخيوط
-        info.handles = GetProcessHandleCount(hProcess, &info.handles) ? info.handles : 0;
-
-        // معلومات الأداء
-        FILETIME createTime, exitTime, kernelTime, userTime;
-        if (GetProcessTimes(hProcess, &createTime, &exitTime, &kernelTime, &userTime)) {
-            ULARGE_INTEGER ull;
-            ull.LowPart = createTime.dwLowDateTime;
-            ull.HighPart = createTime.dwHighDateTime;
-
-            // تحويل Windows FILETIME إلى time_point
-            auto epoch = std::chrono::system_clock::from_time_t(0);
-            auto fileTime = std::chrono::system_clock::time_point(
-                std::chrono::duration_cast<std::chrono::system_clock::duration>(
-                    std::chrono::nanoseconds((ull.QuadPart - 116444736000000000ULL) * 100)
-                )
-            );
-            info.startTime = fileTime;
-        }
-
-        // التحقق من التوقيع الرقمي
-        info.isSigned = verifyDigitalSignature(info.path);
-
-        // سطر الأوامر
-        info.commandLine = getProcessCommandLine(info.pid);
-
-        // الوحدات المحملة
-        enumerateModules(hProcess, info);
-
-        CloseHandle(hProcess);
-
-        // الاتصالات الشبكية
-        getNetworkConnections(info);
-    }
-
-    // ==================== تحليل السلوك ====================
-
-    void analyzeProcessBehavior(ProcessInfo& info) {
-        // تطبيق قواعد الكشف
-        for (const auto& rule : rules) {
-            if (rule.check(info)) {
-                info.isSuspicious = true;
-                info.riskScore += rule.severity * 1.5f;
-
-                SuspiciousBehavior behavior;
-                behavior.type = rule.type;
-                behavior.pid = info.pid;
-                behavior.description = rule.name + " detected in: " +
-                    std::string(info.name.begin(), info.name.end());
-                behavior.timestamp = std::chrono::system_clock::now();
-                behavior.severity = rule.severity;
-
-                {
-                    std::lock_guard<std::mutex> lock(behaviorMutex);
-                    detectedBehaviors.push_back(behavior);
-                }
-
-                logThreat(behavior, info);
+        // هل Elevated؟
+        HANDLE hToken;
+        if (OpenProcessToken(hProcess, TOKEN_QUERY, &hToken)) {
+            TOKEN_ELEVATION elevation;
+            DWORD returnLength;
+            if (GetTokenInformation(hToken, TokenElevation, &elevation,
+                sizeof(elevation), &returnLength)) {
+                report.isElevated = elevation.TokenIsElevated != 0;
             }
+            CloseHandle(hToken);
         }
 
-        // تقييد النتيجة بين 0 و 100
-        info.riskScore = std::min(100.0f, info.riskScore);
-    }
+        // هل Critical System Process؟
+        report.isCriticalSystemProcess = IsCriticalSystemProcess(report.processName);
 
-    void initializeDetectionRules() {
-        // 1. حقن العمليات: فتح عمليات أخرى للكتابة
-        rules.push_back({
-            "Process Injection Attempt",
-            [](const ProcessInfo& info) {
-                // التحقق من وجود أدوات حقن معروفة في الوحدات
-                std::vector<std::wstring> injectionTools = {
-                    L"CreateRemoteThread", L"WriteProcessMemory",
-                    L"SetWindowsHookEx", L"NtMapViewOfSection"
-                };
-                for (const auto& mod : info.loadedModules) {
-                    std::wstring wmod(mod.begin(), mod.end());
-                    for (const auto& tool : injectionTools) {
-                        if (wmod.find(tool) != std::wstring::npos) return true;
-                    }
-                }
-                return false;
-            },
-            9,
-            SuspiciousBehavior::Type::PROCESS_INJECTION
-            });
-
-        // 2. رفع الصلاحيات
-        rules.push_back({
-            "Privilege Escalation",
-            [](const ProcessInfo& info) {
-                // عمليات نظامية مع مسار غير نظامي
-                if (info.isSystem && !info.path.empty()) {
-                    std::wstring wpath = info.path;
-                    std::transform(wpath.begin(), wpath.end(), wpath.begin(), ::tolower);
-                    return wpath.find(L"\\windows\\") == std::wstring::npos &&
-                           wpath.find(L"\\program files") == std::wstring::npos;
-                }
-                return false;
-            },
-            10,
-            SuspiciousBehavior::Type::PRIVILEGE_ESCALATION
-            });
-
-        // 3. البقاء في النظام
-        rules.push_back({
-            "Persistence Mechanism",
-            [](const ProcessInfo& info) {
-                std::wstring cmd = info.commandLine;
-                std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::tolower);
-                return cmd.find(L"run") != std::wstring::npos ||
-                       cmd.find(L"startuo") != std::wstring::npos ||
-                       cmd.find(L"reg add") != std::wstring::npos ||
-                       cmd.find(L"schtasks") != std::wstring::npos;
-            },
-            7,
-            SuspiciousBehavior::Type::PERSISTENCE_MECHANISM
-            });
-
-        // 4. نمط الفدية
-        rules.push_back({
-            "Ransomware Pattern",
-            [](const ProcessInfo& info) {
-                // كتابة مكثفة على الملفات مع تغيير الامتدادات
-                if (info.memoryUsage > 100 * 1024 * 1024) { // > 100MB
-                    std::wstring name = info.name;
-                    std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-                    return name.find(L"encrypt") != std::wstring::npos ||
-                           name.find(L"crypt") != std::wstring::npos ||
-                           name.find(L"lock") != std::wstring::npos;
-                }
-                return false;
-            },
-            10,
-            SuspiciousBehavior::Type::RANSOMWARE_PATTERN
-            });
-
-        // 5. اتصالات شبكية مشبوهة
-        rules.push_back({
-            "Suspicious Network Activity",
-            [](const ProcessInfo& info) {
-                // عمليات غير معروفة مع اتصالات خارجية
-                if (!info.networkConnections.empty()) {
-                    bool isKnownBrowser = info.name.find(L"chrome") != std::wstring::npos ||
-                                        info.name.find(L"firefox") != std::wstring::npos ||
-                                        info.name.find(L"edge") != std::wstring::npos ||
-                                        info.name.find(L"svchost") != std::wstring::npos;
-                    return !isKnownBrowser && !info.isSigned;
-                }
-                return false;
-            },
-            8,
-            SuspiciousBehavior::Type::NETWORK_SUSPICIOUS
-            });
-
-        // 6. مكافحة التصحيح
-        rules.push_back({
-            "Anti-Debugging",
-            [](const ProcessInfo& info) {
-                std::vector<std::wstring> antiDebug = {
-                    L"IsDebuggerPresent", L"CheckRemoteDebuggerPresent",
-                    L"NtQueryInformationProcess", L"OutputDebugString"
-                };
-                for (const auto& mod : info.loadedModules) {
-                    std::wstring wmod(mod.begin(), mod.end());
-                    for (const auto& api : antiDebug) {
-                        if (wmod.find(api) != std::wstring::npos) return true;
-                    }
-                }
-                return false;
-            },
-            6,
-            SuspiciousBehavior::Type::ANTI_DEBUGGING
-            });
-
-        // 7. عمليات مشفرة أو مشبوهة
-        rules.push_back({
-            "Obfuscated Process",
-            [](const ProcessInfo& info) {
-                std::wstring name = info.name;
-                // أسماء عشوائية مثل svch0st.exe بدل svchost.exe
-                if (name.length() > 4) {
-                    int digits = 0;
-                    for (wchar_t c : name) {
-                        if (iswdigit(c)) digits++;
-                    }
-                    return digits > 2; // أكثر من رقمين في الاسم
-                }
-                return false;
-            },
-            5,
-            SuspiciousBehavior::Type::CODE_INJECTION
-            });
-    }
-
-    // ==================== أدوات التحليل ====================
-
-    bool verifyDigitalSignature(const std::wstring& filePath) {
-        if (filePath.empty()) return false;
-
-        WINTRUST_FILE_INFO fileInfo = {};
-        fileInfo.cbStruct = sizeof(fileInfo);
-        fileInfo.pcwszFilePath = filePath.c_str();
-        fileInfo.hFile = NULL;
-        fileInfo.pgKnownSubject = NULL;
-
-        GUID actionGuid = WINTRUST_ACTION_GENERIC_VERIFY_V2;
-        WINTRUST_DATA trustData = {};
-        trustData.cbStruct = sizeof(trustData);
-        trustData.pPolicyCallbackData = NULL;
-        trustData.pSIPClientData = NULL;
-        trustData.dwUIChoice = WTD_UI_NONE;
-        trustData.fdwRevocationChecks = WTD_REVOKE_NONE;
-        trustData.dwUnionChoice = WTD_CHOICE_FILE;
-        trustData.pFile = &fileInfo;
-        trustData.dwStateAction = WTD_STATEACTION_VERIFY;
-        trustData.hWVTStateData = NULL;
-        trustData.pwszURLReference = NULL;
-        trustData.dwProvFlags = WTD_SAFER_FLAG;
-        trustData.dwUIContext = 0;
-
-        LONG result = WinVerifyTrust(NULL, &actionGuid, &trustData);
-
-        trustData.dwStateAction = WTD_STATEACTION_CLOSE;
-        WinVerifyTrust(NULL, &actionGuid, &trustData);
-
-        return result == ERROR_SUCCESS;
-    }
-
-    std::wstring getProcessCommandLine(DWORD pid) {
-        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
-        if (!hProcess) return L"";
-
-        // الحصول على PEB (Process Environment Block)
-        PROCESS_BASIC_INFORMATION pbi;
-        ULONG returnLength;
-
-        typedef NTSTATUS(WINAPI* NtQueryInfoPtr)(
-            HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG
-            );
-
-        HMODULE ntdll = GetModuleHandleA("ntdll.dll");
-        auto NtQueryInformationProcess = (NtQueryInfoPtr)GetProcAddress(ntdll, "NtQueryInformationProcess");
-
-        if (!NtQueryInformationProcess) {
-            CloseHandle(hProcess);
-            return L"";
-        }
-
-        NTSTATUS status = NtQueryInformationProcess(
-            hProcess, ProcessBasicInformation, &pbi, sizeof(pbi), &returnLength
-        );
-
-        if (status != 0) {
-            CloseHandle(hProcess);
-            return L"";
-        }
-
-        // قراءة كتلة البيئة من PEB
-        // (معقد جداً، نستخدم طريقة أبسط هنا)
-
-        // طريقة بديلة: WMI أو سطر الأوامر من GetCommandLine() للعملية نفسها
-        // للتبسيط نعيد فارغ
         CloseHandle(hProcess);
-        return L"";
+        return true;
     }
 
-    void enumerateModules(HANDLE hProcess, ProcessInfo& info) {
+    bool ProcessAnalyzer::GetCommandLine(DWORD processId, std::wstring& cmdLine) {
+        // استخدام NtQueryInformationProcess للحصول على PEB ثم قراءة CommandLine
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+            FALSE, processId);
+        if (!hProcess) return false;
+
+        // Stub: في التنفيذ الكامل، نستخدم NtQueryInformationProcess مع ProcessBasicInformation
+        // ثم نقرأ RTL_USER_PROCESS_PARAMETERS.CommandLine من ذاكرة العملية
+
+        // هذا يتطلب structures من ntdll.h
+
+        cmdLine = L""; // TODO: Implementation
+        CloseHandle(hProcess);
+        return false; // Stub
+    }
+
+    bool ProcessAnalyzer::GetParentProcessId(DWORD processId, DWORD& parentId) {
+        HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (hSnapshot == INVALID_HANDLE_VALUE) return false;
+
+        PROCESSENTRY32W pe;
+        pe.dwSize = sizeof(PROCESSENTRY32W);
+
+        bool found = false;
+        if (Process32FirstW(hSnapshot, &pe)) {
+            do {
+                if (pe.th32ProcessID == processId) {
+                    parentId = pe.th32ParentProcessID;
+                    found = true;
+                    break;
+                }
+            } while (Process32NextW(hSnapshot, &pe));
+        }
+
+        CloseHandle(hSnapshot);
+        return found;
+    }
+
+    bool ProcessAnalyzer::EnumerateModules(DWORD processId, std::vector<ModuleInfo>& modules) {
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+            FALSE, processId);
+        if (!hProcess) return false;
+
         HMODULE hMods[1024];
         DWORD cbNeeded;
 
-        if (EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbNeeded)) {
+        if (EnumProcessModulesEx(hProcess, hMods, sizeof(hMods), &cbNeeded, LIST_MODULES_ALL)) {
             for (unsigned int i = 0; i < (cbNeeded / sizeof(HMODULE)); i++) {
-                char modName[MAX_PATH];
-                if (GetModuleFileNameExA(hProcess, hMods[i], modName, sizeof(modName))) {
-                    info.loadedModules.push_back(modName);
-                }
-            }
-        }
-    }
+                ModuleInfo mod;
+                wchar_t szModName[MAX_PATH];
+                MODULEINFO modInfo;
 
-    void getNetworkConnections(ProcessInfo& info) {
-        // الحصول على اتصالات TCP
-        MIB_TCPTABLE_OWNER_PID* pTcpTable = NULL;
-        DWORD dwSize = 0;
-        DWORD dwRetVal = 0;
+                if (GetModuleFileNameExW(hProcess, hMods[i], szModName, MAX_PATH) &&
+                    GetModuleInformation(hProcess, hMods[i], &modInfo, sizeof(modInfo))) {
 
-        // الحصول على الحجم المطلوب
-        GetExtendedTcpTable(NULL, &dwSize, TRUE, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0);
-        pTcpTable = (MIB_TCPTABLE_OWNER_PID*)malloc(dwSize);
+                    mod.name = GetFileNameFromPath(szModName);
+                    mod.fullPath = szModName;
+                    mod.baseAddress = modInfo.lpBaseOfDll;
+                    mod.size = modInfo.SizeOfImage;
 
-        if (pTcpTable != NULL) {
-            dwRetVal = GetExtendedTcpTable(pTcpTable, &dwSize, TRUE,
-                AF_INET, TCP_TABLE_OWNER_PID_ALL, 0);
+                    // تحليل Module
+                    AnalyzeModule(mod);
 
-            if (dwRetVal == NO_ERROR) {
-                for (DWORD i = 0; i < pTcpTable->dwNumEntries; i++) {
-                    if (pTcpTable->table[i].dwOwningPid == info.pid) {
-                        char localAddr[16], remoteAddr[16];
-
-                        inet_ntop(AF_INET, &pTcpTable->table[i].dwLocalAddr,
-                            localAddr, 16);
-                        inet_ntop(AF_INET, &pTcpTable->table[i].dwRemoteAddr,
-                            remoteAddr, 16);
-
-                        std::string conn = std::string(localAddr) + ":" +
-                            std::to_string(ntohs((u_short)pTcpTable->table[i].dwLocalPort)) +
-                            " -> " + remoteAddr + ":" +
-                            std::to_string(ntohs((u_short)pTcpTable->table[i].dwRemotePort));
-
-                        info.networkConnections.push_back(conn);
-                    }
-                }
-            }
-            free(pTcpTable);
-        }
-    }
-
-    // ==================== المراقبة المستمرة ====================
-
-    void startMonitoring(int intervalSeconds = 5) {
-        if (isMonitoring) return;
-
-        isMonitoring = true;
-        monitorThread = std::thread([this, intervalSeconds]() {
-            while (isMonitoring) {
-                refreshProcessList();
-                detectNewProcesses();
-                checkProcessAnomalies();
-                std::this_thread::sleep_for(std::chrono::seconds(intervalSeconds));
-            }
-            });
-
-        std::cout << "[ACTIVE] Process monitoring started ("
-            << intervalSeconds << "s interval)\n";
-    }
-
-    void stopMonitoring() {
-        isMonitoring = false;
-        if (monitorThread.joinable()) {
-            monitorThread.join();
-        }
-    }
-
-    void detectNewProcesses() {
-        static std::set<DWORD> knownProcesses;
-        std::set<DWORD> currentProcesses;
-
-        {
-            std::lock_guard<std::mutex> lock(cacheMutex);
-            for (const auto& [pid, info] : processCache) {
-                currentProcesses.insert(pid);
-
-                if (knownProcesses.find(pid) == knownProcesses.end()) {
-                    // عملية جديدة
-                    std::wcout << L"[NEW PROCESS] PID: " << pid
-                        << L" | " << info.name;
-
-                    if (info.isSuspicious) {
-                        std::wcout << L" [SUSPICIOUS]";
-                    }
-                    std::wcout << L"\n";
+                    modules.push_back(mod);
                 }
             }
         }
 
-        // التحقق من العمليات المنتهية
-        for (const auto& pid : knownProcesses) {
-            if (currentProcesses.find(pid) == currentProcesses.end()) {
-                std::cout << "[TERMINATED] PID: " << pid << "\n";
+        CloseHandle(hProcess);
+        return true;
+    }
+
+    void ProcessAnalyzer::AnalyzeModule(ModuleInfo& module) {
+        // 1. التحقق من القائمة السوداء
+        // TODO: حساب hash والتحقق
+
+        // 2. التحقق من التوقيع الرقمي
+        if (m_config.checkDigitalSignatures) {
+            WINTRUST_FILE_INFO fileInfo = { 0 };
+            WINTRUST_DATA trustData = { 0 };
+            GUID actionGUID = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+
+            fileInfo.cbStruct = sizeof(fileInfo);
+            fileInfo.pcwszFilePath = module.fullPath.c_str();
+
+            trustData.cbStruct = sizeof(trustData);
+            trustData.dwUIChoice = WTD_UI_NONE;
+            trustData.fdwRevocationChecks = WTD_REVOKE_NONE;
+            trustData.dwUnionChoice = WTD_CHOICE_FILE;
+            trustData.pFile = &fileInfo;
+            trustData.dwStateAction = WTD_STATEACTION_VERIFY;
+
+            LONG result = WinVerifyTrust(NULL, &actionGUID, &trustData);
+            module.isSigned = (result == ERROR_SUCCESS);
+
+            trustData.dwStateAction = WTD_STATEACTION_CLOSE;
+            WinVerifyTrust(NULL, &actionGUID, &trustData);
+        }
+
+        // 3. التحقق من الـ Path مشبوه
+        static const std::vector<std::wstring> suspiciousPaths = {
+            L"\\Temp\\", L"\\tmp\\", L"\\AppData\\Local\\Temp\\",
+            L"\\Downloads\\", L"\\Desktop\\"
+        };
+
+        for (const auto& susPath : suspiciousPaths) {
+            if (module.fullPath.find(susPath) != std::wstring::npos) {
+                module.isSuspicious = true;
+                module.threatInfo = "Loaded from temporary directory";
+                break;
             }
         }
 
-        knownProcesses = currentProcesses;
-    }
+        // 4. التحقق من الاسم المزدوج (Double Extension)
+        std::wstring lowerName = module.name;
+        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::towlower);
 
-    void checkProcessAnomalies() {
-        // التحقق من استهلاك الموارد غير الطبيعي
-        std::lock_guard<std::mutex> lock(cacheMutex);
-
-        for (auto& [pid, info] : processCache) {
-            // استهلاك عالي للذاكرة
-            if (info.memoryUsage > 1024 * 1024 * 1024) { // > 1GB
-                std::wcout << L"[WARNING] High memory usage: " << info.name
-                    << L" (" << (info.memoryUsage / 1024 / 1024) << L" MB)\n";
-            }
-
-            // عمليات بدون توقيع رقمي
-            if (!info.isSigned && !info.isSystem && !info.path.empty()) {
-                bool isKnownGood = false;
-                std::vector<std::wstring> knownGood = {
-                    L"chrome.exe", L"firefox.exe", L"code.exe", L"notepad++.exe"
-                };
-                for (const auto& good : knownGood) {
-                    if (info.name == good) {
-                        isKnownGood = true;
-                        break;
-                    }
-                }
-
-                if (!isKnownGood) {
-                    std::wcout << L"[WARNING] Unsigned process: " << info.name
-                        << L" | Path: " << info.path << L"\n";
-                }
-            }
+        if (lowerName.find(L".exe.dll") != std::wstring::npos ||
+            lowerName.find(L".pdf.exe") != std::wstring::npos) {
+            module.isSuspicious = true;
+            module.threatInfo = "Double extension detected";
         }
     }
 
-    // ==================== التحكم والتقارير ====================
+    bool ProcessAnalyzer::EnumerateMemoryRegions(DWORD processId,
+        std::vector<MemoryRegion>& regions) {
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+            FALSE, processId);
+        if (!hProcess) return false;
 
-public:
-    bool terminateProcess(DWORD pid) {
-        HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
-        if (hProcess == NULL) {
-            std::cerr << "[ERROR] Cannot open process for termination\n";
+        MEMORY_BASIC_INFORMATION mbi;
+        PVOID address = 0;
+
+        while (VirtualQueryEx(hProcess, address, &mbi, sizeof(mbi))) {
+            MemoryRegion region;
+            region.baseAddress = mbi.BaseAddress;
+            region.size = mbi.RegionSize;
+            region.state = mbi.State;
+            region.protect = mbi.Protect;
+            region.type = mbi.Type;
+
+            region.isExecutable = (mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ |
+                PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) != 0;
+            region.isWritable = (mbi.Protect & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE |
+                PAGE_WRITECOPY | PAGE_EXECUTE_WRITECOPY)) != 0;
+
+            // حساب Entropy للمناطق القابلة للتنفيذ والمخصصة
+            if (mbi.State == MEM_COMMIT && region.isExecutable && mbi.Type == MEM_PRIVATE) {
+                float entropy = CalculateMemoryEntropy(hProcess, mbi.BaseAddress,
+                    std::min((SIZE_T)4096, mbi.RegionSize));
+                std::stringstream ss;
+                ss << std::fixed << std::setprecision(2) << entropy;
+                region.entropy = ss.str();
+            }
+            else {
+                region.entropy = "N/A";
+            }
+
+            regions.push_back(region);
+
+            address = (PBYTE)mbi.BaseAddress + mbi.RegionSize;
+        }
+
+        CloseHandle(hProcess);
+        return true;
+    }
+
+    float ProcessAnalyzer::CalculateMemoryEntropy(HANDLE hProcess, PVOID address, SIZE_T size) {
+        std::vector<BYTE> buffer(size);
+        SIZE_T bytesRead;
+
+        if (!ReadProcessMemory(hProcess, address, buffer.data(), size, &bytesRead)) {
+            return 0.0f;
+        }
+
+        // حساب Entropy بتطبيق Shannon Entropy
+        std::map<BYTE, int> frequencies;
+        for (BYTE b : buffer) {
+            frequencies[b]++;
+        }
+
+        float entropy = 0.0f;
+        float len = static_cast<float>(bytesRead);
+
+        for (const auto& [byte, count] : frequencies) {
+            float p = static_cast<float>(count) / len;
+            if (p > 0) {
+                entropy -= p * std::log2(p);
+            }
+        }
+
+        return entropy;
+    }
+
+    bool ProcessAnalyzer::DetectInjection(DWORD processId, std::vector<std::string>& details) {
+        std::vector<MemoryRegion> regions;
+        if (!EnumerateMemoryRegions(processId, regions)) {
             return false;
         }
 
-        BOOL result = TerminateProcess(hProcess, 1);
-        CloseHandle(hProcess);
+        bool found = false;
 
-        if (result) {
-            std::cout << "[ACTION] Terminated process PID: " << pid << "\n";
+        for (const auto& region : regions) {
+            // مؤشرات Injection:
+
+            // 1. Memory Private + Executable + High Entropy
+            if (region.type == MEM_PRIVATE && region.isExecutable && !region.entropy.empty()) {
+                float entropy = std::stof(region.entropy);
+                if (entropy > 7.0f) { // High entropy = likely encrypted/encoded shellcode
+                    details.push_back("Executable private memory with high entropy: " +
+                        region.entropy + " at " + std::to_string((ULONG_PTR)region.baseAddress));
+                    found = true;
+                }
+            }
+
+            // 2. Executable + Writable (RWX) - شائع في Injection
+            if (region.isExecutable && region.isWritable && region.type == MEM_PRIVATE) {
+                details.push_back("RWX memory region detected at " +
+                    std::to_string((ULONG_PTR)region.baseAddress));
+                found = true;
+            }
+
+            // 3. Memory committed outside of modules (حاجة لمقارنة مع Modules)
+            // TODO: التحقق إذا كان العنوان خارج نطاق أي Module معروف
         }
 
-        return result;
+        return found;
     }
 
-    bool suspendProcess(DWORD pid) {
-        HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, pid);
+    bool ProcessAnalyzer::DetectProcessHollowing(DWORD processId) {
+        // Process Hollowing: إنشاء عملية معلقة، استبدال الصورة، ثم الاستئناف
+        // مؤشرات:
+        // 1. العملية بدأت معلقة (CREATE_SUSPENDED)
+        // 2. UnmapViewOfSection على العملية نفسها
+        // 3. WriteProcessMemory لـ ImageBase
+        // 4. SetThreadContext
+        // 5. ResumeThread
+
+        // TODO: مراقبة هذه APIs عبر ETW أو Hooking
+
+        // تحقق بديل: مقارنة Image في الذاكرة مع Image على القرص
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+            FALSE, processId);
         if (!hProcess) return false;
 
-        typedef LONG(NTAPI* NtSuspendProcess)(HANDLE);
-        HMODULE ntdll = GetModuleHandleA("ntdll");
-        auto pfnSuspend = (NtSuspendProcess)GetProcAddress(ntdll, "NtSuspendProcess");
+        // قراءة DOS/NT Headers من الذاكرة والمقارنة مع الملف على القرص
+        // TODO: Implementation
 
-        LONG result = pfnSuspend(hProcess);
         CloseHandle(hProcess);
-
-        return result == 0;
+        return false; // Stub
     }
 
-    void showProcessTree() {
-        std::lock_guard<std::mutex> lock(cacheMutex);
+    bool ProcessAnalyzer::DetectAPIHooking(DWORD processId,
+        std::map<std::string, bool>& hookedModules) {
+        // فحص IAT (Import Address Table) للتعرف على Hooks
 
-        std::cout << "\n=== PROCESS TREE ===\n";
-        std::cout << std::left << std::setw(8) << "PID"
-            << std::setw(8) << "PPID"
-            << std::setw(25) << "Name"
-            << std::setw(10) << "Memory"
-            << std::setw(8) << "Risk"
-            << "Status\n";
-        std::cout << std::string(80, '-') << "\n";
+        // TODO: Implementation يتطلب:
+        // 1. قراءة PE Headers
+        // 2. الاستعراض على Import Directory
+        // 3. مقارنة عناوين Functions مع العناوين الحقيقية في DLLs
+        // 4. التحقق من Inline Hooks (البحث عن patterns مثل JMP, PUSH RET)
 
-        for (const auto& [pid, info] : processCache) {
-            if (info.isSystem) continue; // تجاهل عمليات النظام
-
-            std::string name(info.name.begin(), info.name.end());
-            if (name.length() > 24) name = name.substr(0, 21) + "...";
-
-            std::cout << std::left << std::setw(8) << pid
-                << std::setw(8) << info.parentPid
-                << std::setw(25) << name
-                << std::setw(10) << (info.memoryUsage / 1024 / 1024)
-                << std::setw(8) << (int)info.riskScore
-                << (info.isSuspicious ? "THREAT" :
-                    (info.isSigned ? "Signed" : "Unknown")) << "\n";
-        }
-        std::cout << "====================\n";
+        return false; // Stub
     }
 
-    std::vector<SuspiciousBehavior> getThreats(int minSeverity = 5) {
-        std::lock_guard<std::mutex> lock(behaviorMutex);
-        std::vector<SuspiciousBehavior> threats;
+    float ProcessAnalyzer::CalculateHeuristicScore(const ProcessAnalysisReport& report) {
+        float score = 0.0f;
 
-        for (const auto& behavior : detectedBehaviors) {
-            if (behavior.severity >= minSeverity) {
-                threats.push_back(behavior);
+        // 1. Parent-Child Relationship مشبوه
+        static const std::map<std::wstring, std::vector<std::wstring>> suspiciousRelations = {
+            {L"winword.exe", {L"cmd.exe", L"powershell.exe", L"wscript.exe"}},
+            {L"excel.exe", {L"cmd.exe", L"powershell.exe"}},
+            {L"explorer.exe", {L"mshta.exe", L"regsvr32.exe"}}
+        };
+
+        auto it = suspiciousRelations.find(report.parentProcessName);
+        if (it != suspiciousRelations.end()) {
+            for (const auto& child : it->second) {
+                if (report.processName == child) {
+                    score += 0.4f;
+                    break;
+                }
             }
         }
 
-        return threats;
-    }
-
-    void exportReport(const std::string& filename) {
-        std::ofstream report(filename);
-        report << "=== PROCESS ANALYSIS REPORT ===\n\n";
-
-        {
-            std::lock_guard<std::mutex> lock(cacheMutex);
-            report << "Total Processes: " << processCache.size() << "\n";
-            report << "Suspicious Processes: " <<
-                std::count_if(processCache.begin(), processCache.end(),
-                    [](const auto& p) { return p.second.isSuspicious; }) << "\n\n";
-        }
-
-        {
-            std::lock_guard<std::mutex> lock(behaviorMutex);
-            report << "=== Detected Behaviors ===\n";
-            for (const auto& behavior : detectedBehaviors) {
-                report << "[" << behavior.severity << "/10] "
-                    << behavior.description << "\n";
+        // 2. Modules مشبوهة
+        for (const auto& mod : report.loadedModules) {
+            if (mod.isSuspicious) {
+                score += 0.3f;
+            }
+            if (!mod.isSigned && mod.name.find(L".dll") != std::wstring::npos) {
+                score += 0.1f;
             }
         }
 
-        report.close();
-        std::cout << "[INFO] Process report saved: " << filename << "\n";
-    }
-
-private:
-    void logThreat(const SuspiciousBehavior& behavior, const ProcessInfo& info) {
-        const char* typeStr;
-        switch (behavior.type) {
-        case SuspiciousBehavior::Type::PROCESS_INJECTION: typeStr = "INJECTION"; break;
-        case SuspiciousBehavior::Type::RANSOMWARE_PATTERN: typeStr = "RANSOMWARE"; break;
-        case SuspiciousBehavior::Type::PRIVILEGE_ESCALATION: typeStr = "PRIVESC"; break;
-        case SuspiciousBehavior::Type::NETWORK_SUSPICIOUS: typeStr = "NETWORK"; break;
-        default: typeStr = "SUSPICIOUS";
+        // 3. Memory مشبوه
+        if (report.behavior.injectedCode) {
+            score += 0.5f;
         }
 
-        std::cerr << "\n!!! " << typeStr << " DETECTED !!!\n";
-        std::cerr << "Process: " << std::string(info.name.begin(), info.name.end())
-            << " (PID: " << info.pid << ")\n";
-        std::cerr << "Risk Score: " << info.riskScore << "/100\n";
-        std::cerr << "Description: " << behavior.description << "\n";
-        std::cerr << "Recommendation: " << (behavior.severity > 7 ?
-            "TERMINATE IMMEDIATELY" : "INVESTIGATE") << "\n\n";
+        // 4. Escalation
+        if (report.behavior.attemptedEscalation) {
+            score += 0.3f;
+        }
+
+        // 5. Path مشبوه
+        if (report.executablePath.find(L"\\Temp\\") != std::wstring::npos ||
+            report.executablePath.find(L"\\AppData\\") != std::wstring::npos) {
+            score += 0.2f;
+        }
+
+        // 6. Entropy عالي في الاسم (تجنب detection)
+        // TODO: حساب entropy لـ processName
+
+        return std::min(score, 1.0f);
     }
-};
 
-// ==================== نقطة الاختبار ====================
+    float ProcessAnalyzer::CalculateAIScore(const ProcessAnalysisReport& report) {
+        // TODO: ربط مع AIDetector.cpp
+        // 1. استخراج Features من Report
+        // 2. تجهيز Feature Vector
+        // 3. استدعاء ONNX Model
 
-#ifdef TEST_PROCESS
-int main() {
-    ProcessAnalyzer analyzer;
+        // Feature Vector مؤقت:
+        std::vector<float> features = {
+            static_cast<float>(report.loadedModules.size()) / 100.0f,
+            static_cast<float>(report.memoryRegions.size()) / 1000.0f,
+            report.behavior.injectedCode ? 1.0f : 0.0f,
+            report.isElevated ? 1.0f : 0.0f,
+            static_cast<float>(report.threadCount) / 100.0f
+        };
 
-    std::cout << "AI Antivirus - Process Analyzer\n";
-    std::cout << "Scanning current processes...\n\n";
+        // TODO: AIDetector::GetInstance().Predict(features)
+        return 0.0f; // Stub
+    }
 
-    analyzer.showProcessTree();
+    void ProcessAnalyzer::CheckSuspiciousBehaviors(ProcessAnalysisReport& report) {
+        // فحص سلوكيات محددة من MITRE ATT&CK
 
-    std::cout << "\nStarting real-time monitoring...\n";
-    analyzer.startMonitoring(3); // كل 3 ثواني
+        // 1. Process Injection مؤشرات
+        if (report.behavior.injectedCode) {
+            report.detectedTechniques.push_back(AttackTechnique::PROCESS_INJECTION);
+        }
 
-    std::cout << "Monitoring for 30 seconds...\n";
-    Sleep(30000);
+        // 2. Privilege Escalation
+        if (report.isElevated &&
+            (report.processName == L"cmd.exe" || report.processName == L"powershell.exe")) {
+            report.detectedTechniques.push_back(AttackTechnique::PRIVILEGE_ESCALATION);
+        }
 
-    analyzer.stopMonitoring();
+        // 3. Defense Evasion - Masquerading
+        std::wstring lowerName = report.processName;
+        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::towlower);
 
-    auto threats = analyzer.getThreats(5);
-    std::cout << "\nTotal threats detected: " << threats.size() << "\n";
+        if (lowerName.find(L"svchost") != std::wstring::npos &&
+            report.executablePath.find(L"\\Windows\\System32\\") == std::wstring::npos) {
+            report.detectedTechniques.push_back(AttackTechnique::DEFENSE_EVASION);
+            report.indicators.push_back("Masquerading as svchost.exe from non-system location");
+        }
 
-    analyzer.exportReport("process_report.txt");
+        // 4. Persistence
+        if (report.executablePath.find(L"\\Startup\\") != std::wstring::npos ||
+            report.commandLine.find(L"reg add") != std::wstring::npos) {
+            report.detectedTechniques.push_back(AttackTechnique::PERSISTENCE);
+        }
+    }
 
-    return 0;
-}
-#endif
+    bool ProcessAnalyzer::IsCriticalSystemProcess(const std::wstring& processName) {
+        static const std::set<std::wstring> critical = {
+            L"System", L"Registry", L"smss.exe", L"csrss.exe", L"wininit.exe",
+            L"services.exe", L"lsass.exe", L"svchost.exe", L"crss.exe"
+        };
+        return critical.find(processName) != critical.end();
+    }
+
+    bool ProcessAnalyzer::IsWhitelisted(const std::wstring& processName) {
+        std::shared_lock<std::shared_mutex> lock(m_listMutex);
+        return m_whitelistedProcesses.find(processName) != m_whitelistedProcesses.end();
+    }
+
+    bool ProcessAnalyzer::IsBlacklisted(const std::string& moduleHash) {
+        std::shared_lock<std::shared_mutex> lock(m_listMutex);
+        return m_blacklistedModules.find(moduleHash) != m_blacklistedModules.end();
+    }
+
+    void ProcessAnalyzer::WhitelistProcess(const std::wstring& processName) {
+        std::unique_lock<std::shared_mutex> lock(m_listMutex);
+        m_whitelistedProcesses.insert(processName);
+    }
+
+    void ProcessAnalyzer::BlacklistModule(const std::string& moduleHash) {
+        std::unique_lock<std::shared_mutex> lock(m_listMutex);
+        m_blacklistedModules.insert(moduleHash);
+    }
+
+    std::vector<ProcessAnalysisReport> ProcessAnalyzer::GetSuspiciousProcesses() {
+        auto allProcesses = AnalyzeAllProcesses();
+        std::vector<ProcessAnalysisReport> suspicious;
+
+        for (auto& report : allProcesses) {
+            if (report.isMalicious || report.threatScore > 0.5f) {
+                suspicious.push_back(report);
+            }
+        }
+
+        return suspicious;
+    }
+
+    bool ProcessAnalyzer::StartMonitoringProcess(DWORD processId) {
+        std::lock_guard<std::mutex> lock(m_monitorMutex);
+
+        if (m_monitoredProcesses.find(processId) != m_monitoredProcesses.end()) {
+            return false; // Already monitoring
+        }
+
+        auto thread = std::make_unique<std::thread>(&ProcessAnalyzer::MonitorThreadFunc,
+            this, processId);
+        m_monitoredProcesses[processId] = std::move(thread);
+        return true;
+    }
+
+    void ProcessAnalyzer::StopMonitoringProcess(DWORD processId) {
+        std::lock_guard<std::mutex> lock(m_monitorMutex);
+
+        auto it = m_monitoredProcesses.find(processId);
+        if (it != m_monitoredProcesses.end()) {
+            if (it->second && it->second->joinable()) {
+                it->second->detach(); // TODO: استخدام atomic flag للإيقاف النظيف
+            }
+            m_monitoredProcesses.erase(it);
+        }
+    }
+
+    void ProcessAnalyzer::MonitorThreadFunc(DWORD processId) {
+        // مراقبة مستمرة لعملية معينة
+        // TODO: استخدام ETW للحصول على أحداث العملية في الوقت الفعلي
+
+        while (!m_stopRequested.load()) {
+            // فحص دوري كل 2 ثانية
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+
+            // التحقق من أن العملية لا تزال موجودة
+            HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+            if (!hProcess) {
+                break; // Process terminated
+            }
+            CloseHandle(hProcess);
+
+            // فحص جديد
+            ProcessAnalysisReport report;
+            if (AnalyzeProcess(processId, report)) {
+                if (report.isMalicious && report.threatScore > 0.8f) {
+                    // TODO: إعلام RealTimeMonitor أو Quarantine
+                    // إرسال حدث خطير
+                }
+            }
+        }
+
+        // تنظيف
+        std::lock_guard<std::mutex> lock(m_monitorMutex);
+        m_monitoredProcesses.erase(processId);
+    }
+
+    // ==================== وظائف Static مساعدة ====================
+
+    std::wstring ProcessAnalyzer::GetFileNameFromPath(const std::wstring& path) {
+        size_t pos = path.find_last_of(L"\\/");
+        if (pos != std::wstring::npos) {
+            return path.substr(pos + 1);
+        }
+        return path;
+    }
+
+    std::string ProcessAnalyzer::BytesToHexString(const BYTE* data, size_t len) {
+        std::stringstream ss;
+        ss << std::hex << std::setfill('0');
+        for (size_t i = 0; i < len; ++i) {
+            ss << std::setw(2) << static_cast<int>(data[i]);
+        }
+        return ss.str();
+    }
+
+    bool ProcessAnalyzer::ReadProcessMemorySafe(HANDLE hProcess, LPCVOID address,
+        LPVOID buffer, SIZE_T size) {
+        SIZE_T bytesRead;
+        return ReadProcessMemory(hProcess, address, buffer, size, &bytesRead) &&
+            bytesRead == size;
+    }
+
+} // namespace AIAntivirus

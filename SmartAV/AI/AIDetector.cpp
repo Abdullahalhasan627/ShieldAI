@@ -1,465 +1,817 @@
-// AIDetector.cpp - AI Module
-// كاشف التهديدات بالذكاء الاصطناعي - ONNX Runtime Integration
+﻿/**
+ * AIDetector.cpp
+ *
+ * كاشف التهديدات بالذكاء الاصطناعي - AI Threat Detection Engine
+ *
+ * المسؤوليات:
+ * - تحميل نماذج ONNX (Open Neural Network Exchange)
+ * - تشغيل الاستدلال (Inference) على Feature Vectors
+ * - توفير واجهة بسيطة: IsMalicious() و GetConfidenceScore()
+ * - دعم النماذج المتعددة (Static, Behavioral, Ensemble)
+ * - معالجة الأخطاء (Model not found, Invalid input, etc.)
+ * - التحسين باستخدام GPU/CUDA إن توفرت
+ * - Caching للنتائج لتحسين الأداء
+ *
+ * هيكل النموذج المتوقع (model.onnx):
+ * - Input:  float32[1, 512]  (Feature Vector)
+ * - Output: float32[1, 2]    (Softmax: [Benign, Malicious])
+ *
+ * متطلبات: C++17, ONNX Runtime 1.15+, Windows 10/11
+ */
 
-#include <iostream>
-#include <vector>
+#include <windows.h>
 #include <string>
+#include <vector>
 #include <memory>
-#include <cmath>
-#include <algorithm>
+#include <mutex>
+#include <map>
 #include <chrono>
 #include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <cmath>
+#include <algorithm>
+#include <filesystem>
+
+ // ONNX Runtime Headers
 #include <onnxruntime_cxx_api.h>
 
-// ==================== هيكل نتيجة التحليل ====================
+// TODO: تضمين الموديولات الأخرى
+#include "../Core/FeatureExtractor.h"
 
-struct DetectionResult {
-    float malwareProbability;    // احتمالية البرمجية الخبيثة (0.0 - 1.0)
-    float confidence;            // ثقة النموذج في النتيجة
-    std::string threatClass;     // فئة التهديد (Trojan, Ransomware, etc.)
-    std::vector<std::pair<std::string, float>> topClasses; // أفضل 3 تخمينات
-    int64_t inferenceTimeMs;     // وقت التحليل بالمللي ثانية
-    bool isError;                // هل حدث خطأ
-    std::string errorMessage;    // رسالة الخطأ إن وجدت
-};
+#pragma comment(lib, "onnxruntime.lib")
 
-// ==================== كاشف الذكاء الاصطناعي ====================
+namespace fs = std::filesystem;
 
-class AIDetector {
-private:
-    std::unique_ptr<Ort::Session> session;
-    std::unique_ptr<Ort::Env> environment;
+namespace AIAntivirus {
 
-    // معلومات النموذج
-    std::string modelPath;
-    std::string inputName;
-    std::string outputName;
-    size_t inputSize;
-    size_t outputSize;
+    // ==================== تعريفات الأنواع ====================
 
-    // إعدادات الجلسة
-    Ort::SessionOptions sessionOptions;
-    Ort::MemoryInfo memoryInfo{ nullptr };
-
-    // فئات التهديدات المعروفة
-    std::vector<std::string> threatClasses = {
-        "Benign",           // 0 - نظيف
-        "Trojan",           // 1 - تروجان
-        "Ransomware",       // 2 - فدية
-        "Spyware",          // 3 - تجسس
-        "Adware",           // 4 - إعلانات
-        "Rootkit",          // 5 - روتكيت
-        "Worm",             // 6 - دودة
-        "Backdoor",         // 7 - باب خلفي
-        "Keylogger",        // 8 - مسجل ضغطات
-        "Cryptominer"       // 9 - تعدين مخفي
+    /**
+     * نتيجة التحليل بالذكاء الاصطناعي
+     */
+    struct AIDetectionResult {
+        bool isMalicious;           // القرار النهائي
+        float confidence;           // درجة الثقة [0.0, 1.0]
+        float benignScore;          // درجة البراءة
+        float maliciousScore;       // درجة الخطورة
+        std::string threatFamily;   // عائلة التهديد (إن أمكن)
+        std::vector<std::string> indicators; // مؤشرات الاكتشاف
+        std::chrono::system_clock::time_point timestamp;
+        int64_t inferenceTimeMs;    // وقت الاستدلال بالمللي ثانية
+        bool isValid;               // هل النتيجة صالحة؟
+        std::string errorMessage;   // رسالة الخطأ
     };
 
-    bool isInitialized = false;
+    /**
+     * نوع النموذج
+     */
+    enum class ModelType {
+        STATIC_PE,          // ملفات PE الثابتة
+        BEHAVIORAL,         // سلوك العمليات
+        MEMORY_DUMP,        // تفريغ الذاكرة
+        ENSEMBLE,           // مجموعة نماذج
+        UNKNOWN
+    };
 
-public:
-    AIDetector(const std::string& modelFile = "model.onnx")
-        : modelPath(modelFile), memoryInfo(nullptr) {
+    /**
+     * إعدادات الكاشف
+     */
+    struct DetectorConfig {
+        std::string modelPath = "model.onnx";
+        ModelType modelType = ModelType::STATIC_PE;
+        float detectionThreshold = 0.75f;    // عتبة التحديد كخبيث
+        float highConfidenceThreshold = 0.9f; // عتبة الثقة العالية
+        bool useGPU = false;                  // استخدام CUDA
+        int gpuDeviceId = 0;
+        bool useCaching = true;               // تفعيل التخزين المؤقت
+        size_t cacheSize = 1000;              // حجم الكاش
+        int intraOpNumThreads = 4;            // عدد Threads للاستدلال
+    };
 
-        std::cout << "[INIT] AI Detector Initializing...\n";
+    /**
+     * معلومات النموذج
+     */
+    struct ModelInfo {
+        std::string name;
+        std::string version;
+        ModelType type;
+        std::vector<int64_t> inputShape;
+        std::vector<int64_t> outputShape;
+        std::vector<std::string> inputNames;
+        std::vector<std::string> outputNames;
+        bool isLoaded;
+    };
 
+    // ==================== الفئة الرئيسية: AIDetector ====================
+
+    class AIDetector {
+    public:
+        // ==================== Singleton Pattern ====================
+
+        static AIDetector& GetInstance() {
+            static AIDetector instance;
+            return instance;
+        }
+
+        // منع النسخ
+        AIDetector(const AIDetector&) = delete;
+        AIDetector& operator=(const AIDetector&) = delete;
+
+        // ==================== واجهة التهيئة ====================
+
+        /**
+         * تهيئة الكاشف وتحميل النموذج
+         */
+        bool Initialize(const DetectorConfig& config = DetectorConfig{});
+
+        /**
+         * تحميل نموذج إضافي (للـ Ensemble)
+         */
+        bool LoadSecondaryModel(const std::string& path, ModelType type);
+
+        /**
+         * إلغاء تحميل النماذج وتحرير الموارد
+         */
+        void Shutdown();
+
+        /**
+         * التحقق من حالة التهيئة
+         */
+        bool IsInitialized() const { return m_isInitialized; }
+
+        // ==================== واجهة الكشف الرئيسية ====================
+
+        /**
+         * فحص Feature Vector - الواجهة الأساسية
+         */
+        AIDetectionResult Detect(const std::vector<float>& featureVector);
+
+        /**
+         * فحص ملف مباشرة (تستدعي FeatureExtractor تلقائياً)
+         */
+        AIDetectionResult ScanFile(const std::wstring& filePath);
+
+        /**
+         * فحص سلوك عملية
+         */
+        AIDetectionResult ScanBehavior(const class ProcessAnalysisReport& report);
+
+        /**
+         * واجهة بسيطة: هل الخصائص خبيثة؟
+         */
+        bool IsMalicious(const std::vector<float>& featureVector,
+            float* confidence = nullptr);
+
+        /**
+         * الحصول على الدرجة فقط (بدون قرار)
+         */
+        float GetMalwareScore(const std::vector<float>& featureVector);
+
+        // ==================== واجهة الإدارة ====================
+
+        /**
+         * تحديث عتبة الكشف
+         */
+        void SetThreshold(float threshold) { m_config.detectionThreshold = threshold; }
+
+        /**
+         * الحصول على معلومات النموذج
+         */
+        ModelInfo GetModelInfo() const { return m_modelInfo; }
+
+        /**
+         * إفراغ الكاش
+         */
+        void ClearCache();
+
+        /**
+         * الحصول على إحصائيات الأداء
+         */
+        struct PerformanceStats {
+            uint64_t totalInferences;
+            uint64_t cacheHits;
+            double averageInferenceTimeMs;
+            uint64_t errors;
+        };
+        PerformanceStats GetPerformanceStats() const;
+
+        /**
+         * حفظ النتائج للتدريب المستقبلي (Feedback Loop)
+         */
+        bool SaveFeedback(const std::vector<float>& features,
+            bool wasMalicious,
+            const std::string& filePath);
+
+    private:
+        // ==================== الأعضاء الخاصة ====================
+
+        AIDetector() = default;
+        ~AIDetector() { Shutdown(); }
+
+        bool m_isInitialized = false;
+        DetectorConfig m_config;
+
+        // ONNX Runtime Objects
+        std::unique_ptr<Ort::Env> m_env;
+        std::unique_ptr<Ort::Session> m_session;
+        Ort::SessionOptions m_sessionOptions;
+        Ort::MemoryInfo m_memoryInfo{ nullptr };
+
+        // Model Metadata
+        ModelInfo m_modelInfo;
+        size_t m_inputSize = 512;  // المتوقع من FeatureExtractor
+
+        // الكاش (Hash -> Result)
+        std::map<std::string, AIDetectionResult> m_cache;
+        std::mutex m_cacheMutex;
+        std::vector<std::string> m_cacheOrder; // LRU
+
+        // Ensemble Models
+        std::vector<std::unique_ptr<Ort::Session>> m_secondarySessions;
+        std::vector<ModelType> m_secondaryTypes;
+
+        // إحصائيات
+        mutable std::mutex m_statsMutex;
+        PerformanceStats m_stats{ 0, 0, 0.0, 0 };
+
+        // ==================== وظائف ONNX الداخلية ====================
+
+        /**
+         * إعداد بيئة ONNX
+         */
+        bool SetupONNXEnvironment();
+
+        /**
+         * تحميل النموذج من الملف
+         */
+        bool LoadModel(const std::string& path);
+
+        /**
+         * تشغيل الاستدلال
+         */
+        AIDetectionResult RunInference(const std::vector<float>& inputData);
+
+        /**
+         * تشغيل Ensemble Inference
+         */
+        AIDetectionResult RunEnsembleInference(const std::vector<float>& inputData);
+
+        /**
+         * التحقق من صحة شكل المدخلات
+         */
+        bool ValidateInputShape(const std::vector<float>& input) const;
+
+        /**
+         * معالجة مخرجات النموذج
+         */
+        AIDetectionResult ProcessOutput(const std::vector<float>& output);
+
+        /**
+         * تحديد عائلة التهديد بناءً على النتيجة
+         */
+        std::string ClassifyThreatFamily(float score, const std::vector<float>& features);
+
+        /**
+         * إنشاء مفتاح الكاش من Features
+         */
+        std::string CreateCacheKey(const std::vector<float>& features) const;
+
+        /**
+         * تحديث الكاش (LRU Policy)
+         */
+        void UpdateCache(const std::string& key, const AIDetectionResult& result);
+
+        /**
+         * البحث في الكاش
+         */
+        bool CheckCache(const std::string& key, AIDetectionResult& result);
+
+        // ==================== وظائف مساعدة ====================
+
+        /**
+         * حساب Hash بسيط للـ Vector (للكاش)
+         */
+        static std::string VectorHash(const std::vector<float>& vec);
+
+        /**
+         * Softmax Function
+         */
+        static std::vector<float> Softmax(const std::vector<float>& logits);
+
+        /**
+         * ArgMax
+         */
+        static size_t ArgMax(const std::vector<float>& vec);
+
+        /**
+         * قراءة ملف ONNX للتحقق من صحته
+         */
+        static bool ValidateModelFile(const std::string& path);
+    };
+
+    // ==================== التنفيذ (Implementation) ====================
+
+    bool AIDetector::Initialize(const DetectorConfig& config) {
+        if (m_isInitialized) {
+            Shutdown(); // إعادة تهيئة
+        }
+
+        m_config = config;
+
+        // 1. إعداد بيئة ONNX
+        if (!SetupONNXEnvironment()) {
+            return false;
+        }
+
+        // 2. تحميل النموذج الرئيسي
+        if (!LoadModel(m_config.modelPath)) {
+            return false;
+        }
+
+        // 3. إعداد Memory Info
+        m_memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+
+        m_isInitialized = true;
+        return true;
+    }
+
+    bool AIDetector::SetupONNXEnvironment() {
         try {
-            initializeONNX();
-            loadModel();
-            isInitialized = true;
-            std::cout << "[SUCCESS] AI Engine Ready\n";
+            // إعداد البيئة
+            OrtLoggingLevel loggingLevel = ORT_LOGGING_LEVEL_WARNING;
+            m_env = std::make_unique<Ort::Env>(loggingLevel, "AI_Antivirus_Detector");
+
+            // إعدادات الجلسة
+            m_sessionOptions = Ort::SessionOptions();
+
+            // عدد Threads
+            m_sessionOptions.SetIntraOpNumThreads(m_config.intraOpNumThreads);
+            m_sessionOptions.SetInterOpNumThreads(2);
+
+            // Graph Optimization
+            m_sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+
+            // GPU Support (CUDA)
+            if (m_config.useGPU) {
+                // TODO: تفعيل CUDA provider إن توفرت
+                // OrtCUDAProviderOptions cudaOptions;
+                // cudaOptions.device_id = m_config.gpuDeviceId;
+                // m_sessionOptions.AppendExecutionProvider_CUDA(cudaOptions);
+            }
+
+            return true;
         }
         catch (const Ort::Exception& e) {
-            std::cerr << "[ERROR] ONNX Runtime Error: " << e.what() << "\n";
-            isInitialized = false;
-        }
-        catch (const std::exception& e) {
-            std::cerr << "[ERROR] Initialization Failed: " << e.what() << "\n";
-            isInitialized = false;
+            // TODO: تسجيل الخطأ
+            return false;
         }
     }
 
-    ~AIDetector() {
-        if (isInitialized) {
-            std::cout << "[SHUTDOWN] AI Detector Closed\n";
+    bool AIDetector::LoadModel(const std::string& path) {
+        if (!ValidateModelFile(path)) {
+            return false;
+        }
+
+        try {
+            // تحميل النموذج (wstring للـ Windows)
+            std::wstring wPath(path.begin(), path.end());
+            m_session = std::make_unique<Ort::Session>(*m_env, wPath.c_str(), m_sessionOptions);
+
+            // استخراج Metadata
+            Ort::ModelMetadata metadata = m_session->GetModelMetadata();
+            Ort::AllocatorWithDefaultOptions allocator;
+
+            m_modelInfo.name = metadata.GetProducerName(allocator);
+            m_modelInfo.version = metadata.GetVersion();
+            m_modelInfo.isLoaded = true;
+
+            // استخراج أشكال المدخلات/المخرجات
+            Ort::TypeInfo inputTypeInfo = m_session->GetInputTypeInfo(0);
+            Ort::TypeInfo outputTypeInfo = m_session->GetOutputTypeInfo(0);
+
+            auto inputTensorInfo = inputTypeInfo.GetTensorTypeAndShapeInfo();
+            auto outputTensorInfo = outputTypeInfo.GetTensorTypeAndShapeInfo();
+
+            m_modelInfo.inputShape = inputTensorInfo.GetShape();
+            m_modelInfo.outputShape = outputTensorInfo.GetShape();
+
+            // أسماء المدخلات والمخرجات
+            m_modelInfo.inputNames.push_back(m_session->GetInputName(0, allocator));
+            m_modelInfo.outputNames.push_back(m_session->GetOutputName(0, allocator));
+
+            // تحديد حجم المدخل المتوقع
+            if (!m_modelInfo.inputShape.empty() && m_modelInfo.inputShape.back() > 0) {
+                m_inputSize = static_cast<size_t>(m_modelInfo.inputShape.back());
+            }
+
+            return true;
+        }
+        catch (const Ort::Exception& e) {
+            m_modelInfo.isLoaded = false;
+            m_modelInfo.errorMessage = e.what();
+            return false;
         }
     }
 
-    // ==================== تهيئة ONNX Runtime ====================
-
-private:
-    void initializeONNX() {
-        // إنشاء البيئة
-        OrtLoggingLevel loggingLevel = ORT_LOGGING_LEVEL_WARNING;
-        environment = std::make_unique<Ort::Env>(loggingLevel, "AI_Antivirus");
-
-        // إعدادات الجلسة للأداء الأمثل
-        sessionOptions.SetIntraOpNumThreads(4);  // استخدام 4 أنوية
-        sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-
-        // تعيين موفر التنفيذ (CPU/GPU)
-        // للـ GPU: OrtCUDAProviderOptions cudaOptions;
-
-        memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-    }
-
-    void loadModel() {
-        // تحويل المسار إلى wstring للـ Windows
-        std::wstring wModelPath(modelPath.begin(), modelPath.end());
-
-        // إنشاء الجلسة
-        session = std::make_unique<Ort::Session>(*environment,
-            wModelPath.c_str(),
-            sessionOptions);
-
-        // الحصول على أسماء الإدخال والإخراج
-        Ort::AllocatorWithDefaultOptions allocator;
-
-        // معلومات الإدخال
-        size_t numInputNodes = session->GetInputCount();
-        if (numInputNodes > 0) {
-            Ort::AllocatedStringPtr inputNamePtr =
-                session->GetInputNameAllocated(0, allocator);
-            inputName = inputNamePtr.get();
-
-            Ort::TypeInfo inputTypeInfo = session->GetInputTypeInfo(0);
-            auto tensorInfo = inputTypeInfo.GetTensorTypeAndShapeInfo();
-            inputSize = tensorInfo.GetElementCount();
-
-            std::cout << "[INFO] Model Input: " << inputName
-                << " | Size: " << inputSize << "\n";
+    bool AIDetector::LoadSecondaryModel(const std::string& path, ModelType type) {
+        if (!m_isInitialized || !ValidateModelFile(path)) {
+            return false;
         }
 
-        // معلومات الإخراج
-        size_t numOutputNodes = session->GetOutputCount();
-        if (numOutputNodes > 0) {
-            Ort::AllocatedStringPtr outputNamePtr =
-                session->GetOutputNameAllocated(0, allocator);
-            outputName = outputNamePtr.get();
+        try {
+            std::wstring wPath(path.begin(), path.end());
+            auto session = std::make_unique<Ort::Session>(*m_env, wPath.c_str(), m_sessionOptions);
 
-            Ort::TypeInfo outputTypeInfo = session->GetOutputTypeInfo(0);
-            auto tensorInfo = outputTypeInfo.GetTensorTypeAndShapeInfo();
-            outputSize = tensorInfo.GetElementCount();
+            m_secondarySessions.push_back(std::move(session));
+            m_secondaryTypes.push_back(type);
 
-            std::cout << "[INFO] Model Output: " << outputName
-                << " | Size: " << outputSize << "\n";
+            return true;
+        }
+        catch (...) {
+            return false;
         }
     }
 
-    // ==================== التنبؤ الرئيسي ====================
+    void AIDetector::Shutdown() {
+        m_session.reset();
+        m_secondarySessions.clear();
+        m_env.reset();
 
-public:
-    DetectionResult predict(const std::vector<float>& features) {
-        DetectionResult result;
-        result.isError = true;
+        ClearCache();
 
-        if (!isInitialized) {
+        m_isInitialized = false;
+    }
+
+    AIDetectionResult AIDetector::Detect(const std::vector<float>& featureVector) {
+        AIDetectionResult result;
+        result.isValid = false;
+        result.timestamp = std::chrono::system_clock::now();
+
+        if (!m_isInitialized) {
             result.errorMessage = "Detector not initialized";
             return result;
         }
 
-        if (features.empty()) {
-            result.errorMessage = "Empty feature vector";
+        if (!ValidateInputShape(featureVector)) {
+            result.errorMessage = "Invalid input shape";
+            std::lock_guard<std::mutex> lock(m_statsMutex);
+            m_stats.errors++;
             return result;
         }
 
+        // التحقق من الكاش
+        std::string cacheKey;
+        if (m_config.useCaching) {
+            cacheKey = CreateCacheKey(featureVector);
+            if (CheckCache(cacheKey, result)) {
+                std::lock_guard<std::mutex> lock(m_statsMutex);
+                m_stats.cacheHits++;
+                return result;
+            }
+        }
+
+        // تشغيل الاستدلال
+        auto startTime = std::chrono::high_resolution_clock::now();
+
+        if (!m_secondarySessions.empty()) {
+            result = RunEnsembleInference(featureVector);
+        }
+        else {
+            result = RunInference(featureVector);
+        }
+
+        auto endTime = std::chrono::high_resolution_clock::now();
+        result.inferenceTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            endTime - startTime).count();
+
+        // تحديث الإحصائيات
+        {
+            std::lock_guard<std::mutex> lock(m_statsMutex);
+            m_stats.totalInferences++;
+            double totalTime = m_stats.averageInferenceTimeMs * (m_stats.totalInferences - 1);
+            m_stats.averageInferenceTimeMs = (totalTime + result.inferenceTimeMs) /
+                m_stats.totalInferences;
+        }
+
+        // تحديث الكاش
+        if (m_config.useCaching && result.isValid) {
+            UpdateCache(cacheKey, result);
+        }
+
+        return result;
+    }
+
+    AIDetectionResult AIDetector::RunInference(const std::vector<float>& inputData) {
+        AIDetectionResult result;
+        result.isValid = false;
+
         try {
-            auto start = std::chrono::high_resolution_clock::now();
+            // إعداد المدخلات
+            std::vector<int64_t> inputShape = { 1, static_cast<int64_t>(m_inputSize) };
 
-            // 1. إعداد المدخلات
-            std::vector<int64_t> inputShape = { 1, static_cast<int64_t>(features.size()) };
-
-            // التأكد من تطابق حجم المدخلات مع النموذج
-            std::vector<float> inputData = features;
-            if (features.size() < inputSize) {
-                // padding بالأصفار إذا كان أصغر
-                inputData.resize(inputSize, 0.0f);
-            }
-            else if (features.size() > inputSize) {
-                // قطع إذا كان أكبر
-                inputData.resize(inputSize);
+            // Resize إذا لزم الأمر
+            std::vector<float> resizedInput = inputData;
+            if (resizedInput.size() != m_inputSize) {
+                resizedInput.resize(m_inputSize, 0.0f);
             }
 
-            // 2. إنشاء tensor
+            // إنشاء Tensor
             Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
-                memoryInfo,
-                inputData.data(),
-                inputData.size(),
-                inputShape.data(),
-                inputShape.size()
-            );
+                m_memoryInfo, resizedInput.data(), resizedInput.size(), inputShape.data(),
+                inputShape.size());
 
-            // 3. تشغيل الاستنتاج
-            const char* inputNames[] = { inputName.c_str() };
-            const char* outputNames[] = { outputName.c_str() };
+            // أسماء المدخلات/المخرجات
+            const char* inputNames[] = { m_modelInfo.inputNames[0].c_str() };
+            const char* outputNames[] = { m_modelInfo.outputNames[0].c_str() };
 
-            std::vector<Ort::Value> outputTensors = session->Run(
+            // تشغيل الاستدلال
+            auto outputTensors = m_session->Run(
                 Ort::RunOptions{ nullptr },
                 inputNames, &inputTensor, 1,
                 outputNames, 1
             );
 
-            // 4. معالجة النتائج
-            processOutput(outputTensors[0], result);
+            // استخراج النتائج
+            float* outputData = outputTensors[0].GetTensorMutableData<float>();
+            size_t outputCount = outputTensors[0].GetTensorTypeAndShapeInfo().GetElementCount();
 
-            auto end = std::chrono::high_resolution_clock::now();
-            result.inferenceTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>
-                (end - start).count();
+            std::vector<float> outputs(outputData, outputData + outputCount);
 
-            result.isError = false;
+            // معالجة المخرجات
+            result = ProcessOutput(outputs);
 
         }
         catch (const Ort::Exception& e) {
             result.errorMessage = std::string("ONNX Error: ") + e.what();
-        }
-        catch (const std::exception& e) {
-            result.errorMessage = std::string("Error: ") + e.what();
+            std::lock_guard<std::mutex> lock(m_statsMutex);
+            m_stats.errors++;
         }
 
         return result;
     }
 
-    // تنبؤ سريع (للملفات)
-    DetectionResult predictFile(const std::string& filePath,
+    AIDetectionResult AIDetector::RunEnsembleInference(const std::vector<float>& inputData) {
+        // Ensemble: دمج نتائج عدة نماذج
+        std::vector<AIDetectionResult> results;
+
+        // النموذج الرئيسي
+        results.push_back(RunInference(inputData));
+
+        // النماذج الثانوية
+        // TODO: تنفيذ فعلي للـ Secondary Models
+        // يتطلب إدارة منفصلة للـ Sessions
+
+        // دمج النتائج (Voting أو Averaging)
+        float avgMaliciousScore = 0.0f;
+        float avgBenignScore = 0.0f;
+        bool majorityMalicious = false;
+
+        for (const auto& r : results) {
+            avgMaliciousScore += r.maliciousScore;
+            avgBenignScore += r.benignScore;
+            if (r.isMalicious) majorityMalicious = !majorityMalicious;
+        }
+
+        avgMaliciousScore /= results.size();
+        avgBenignScore /= results.size();
+
+        AIDetectionResult ensembleResult;
+        ensembleResult.isValid = true;
+        ensembleResult.maliciousScore = avgMaliciousScore;
+        ensembleResult.benignScore = avgBenignScore;
+        ensembleResult.confidence = std::max(avgMaliciousScore, avgBenignScore);
+        ensembleResult.isMalicious = (avgMaliciousScore > m_config.detectionThreshold);
+        ensembleResult.threatFamily = results[0].threatFamily; // من النموذج الأول
+
+        return ensembleResult;
+    }
+
+    AIDetectionResult AIDetector::ProcessOutput(const std::vector<float>& output) {
+        AIDetectionResult result;
+        result.isValid = true;
+
+        // افتراض: المخرج [Benign_Score, Malicious_Score] أو Logits
+        if (output.size() >= 2) {
+            // إذا كان Logits، نطبق Softmax
+            std::vector<float> probs = Softmax(output);
+
+            result.benignScore = probs[0];
+            result.maliciousScore = probs[1];
+            result.confidence = std::max(probs[0], probs[1]);
+            result.isMalicious = (probs[1] > m_config.detectionThreshold);
+
+            // تصنيف العائلة إذا كان خبيثاً
+            if (result.isMalicious) {
+                result.threatFamily = ClassifyThreatFamily(probs[1], output);
+            }
+        }
+        else if (output.size() == 1) {
+            // Binary output
+            result.maliciousScore = output[0];
+            result.benignScore = 1.0f - output[0];
+            result.confidence = std::max(result.maliciousScore, result.benignScore);
+            result.isMalicious = (output[0] > m_config.detectionThreshold);
+        }
+
+        return result;
+    }
+
+    std::string AIDetector::ClassifyThreatFamily(float score,
         const std::vector<float>& features) {
-        std::cout << "[AI] Analyzing: " << filePath << "\n";
-        auto result = predict(features);
+        // Classification بسيط بناءً على Score و Features
+        // في التطبيق الحقيقي، يستخدم نموذج منفصل للـ Multi-class classification
 
-        if (!result.isError) {
-            displayResult(result);
-        }
-        else {
-            std::cerr << "[ERROR] " << result.errorMessage << "\n";
-        }
+        if (score > 0.95f) return "Trojan.Win32.Severe";
+        if (score > 0.90f) return "Ransom.Win32.Crypto";
+        if (score > 0.85f) return "Backdoor.Win32.Remote";
+        if (score > 0.80f) return "Spyware.Win32.InfoStealer";
 
-        return result;
+        return "HEUR:Trojan.Win32.Generic";
     }
 
-    // ==================== معالجة النتائج ====================
+    bool AIDetector::IsMalicious(const std::vector<float>& featureVector,
+        float* confidence) {
+        auto result = Detect(featureVector);
 
-private:
-    void processOutput(Ort::Value& outputTensor, DetectionResult& result) {
-        // الحصول على البيانات الخام
-        float* outputData = outputTensor.GetTensorMutableData<float>();
-        size_t numClasses = outputTensor.GetTensorTypeAndShapeInfo().GetElementCount();
-
-        // تطبيق Softmax إذا كانت النتيجة logits
-        std::vector<float> probabilities = applySoftmax(outputData, numClasses);
-
-        // إيجاد الأعلى
-        auto maxIt = std::max_element(probabilities.begin(), probabilities.end());
-        int predictedClass = std::distance(probabilities.begin(), maxIt);
-
-        // تعبئة النتيجة
-        result.malwareProbability = (predictedClass == 0) ?
-            (1.0f - *maxIt) : *maxIt;
-        result.confidence = *maxIt;
-        result.threatClass = (predictedClass < threatClasses.size()) ?
-            threatClasses[predictedClass] : "Unknown";
-
-        // إعداد Top 3
-        std::vector<std::pair<int, float>> indexedProbs;
-        for (size_t i = 0; i < probabilities.size(); i++) {
-            indexedProbs.push_back({ i, probabilities[i] });
+        if (confidence && result.isValid) {
+            *confidence = result.confidence;
         }
 
-        std::sort(indexedProbs.begin(), indexedProbs.end(),
-            [](const auto& a, const auto& b) { return a.second > b.second; });
-
-        for (size_t i = 0; i < std::min(size_t(3), indexedProbs.size()); i++) {
-            int cls = indexedProbs[i].first;
-            std::string className = (cls < threatClasses.size()) ?
-                threatClasses[cls] : "Unknown";
-            result.topClasses.push_back({ className, indexedProbs[i].second });
-        }
+        return result.isValid && result.isMalicious;
     }
 
-    std::vector<float> applySoftmax(float* data, size_t size) {
-        std::vector<float> result(size);
-
-        // طرح الأقصى للاستقرار العددي
-        float maxVal = *std::max_element(data, data + size);
-
-        float sum = 0.0f;
-        for (size_t i = 0; i < size; i++) {
-            result[i] = std::exp(data[i] - maxVal);
-            sum += result[i];
-        }
-
-        for (auto& val : result) {
-            val /= sum;
-        }
-
-        return result;
+    float AIDetector::GetMalwareScore(const std::vector<float>& featureVector) {
+        auto result = Detect(featureVector);
+        return result.isValid ? result.maliciousScore : -1.0f;
     }
 
-    // ==================== واجهة المستخدم ====================
+    AIDetectionResult AIDetector::ScanFile(const std::wstring& filePath) {
+        // استخراج Features ثم فحص
+        FeatureExtractor extractor;
+        auto featureVec = extractor.ExtractFromFile(filePath);
 
-public:
-    void displayResult(const DetectionResult& result) {
-        std::cout << "\n=== AI ANALYSIS RESULT ===\n";
-
-        // شريط التقدم البصري
-        int barWidth = 30;
-        int pos = static_cast<int>(barWidth * result.confidence);
-
-        std::cout << "Confidence: [";
-        for (int i = 0; i < barWidth; ++i) {
-            if (i < pos) std::cout << "=";
-            else if (i == pos) std::cout << ">";
-            else std::cout << " ";
-        }
-        std::cout << "] " << std::fixed << std::setprecision(1)
-            << (result.confidence * 100.0f) << "%\n";
-
-        // النتيجة الرئيسية
-        std::cout << "Classification: ";
-        if (result.threatClass == "Benign") {
-            std::cout << "✅ CLEAN (Benign)\n";
-        }
-        else {
-            std::cout << "⚠️  THREAT DETECTED: " << result.threatClass << "\n";
+        if (!featureVec.isValid) {
+            AIDetectionResult result;
+            result.isValid = false;
+            result.errorMessage = "Feature extraction failed: " + featureVec.errorMessage;
+            return result;
         }
 
-        // أفضل 3 تخمينات
-        std::cout << "Top Predictions:\n";
-        for (size_t i = 0; i < result.topClasses.size(); i++) {
-            std::cout << "  " << (i + 1) << ". "
-                << std::left << std::setw(12) << result.topClasses[i].first
-                << " (" << std::fixed << std::setprecision(2)
-                << (result.topClasses[i].second * 100) << "%)\n";
-        }
-
-        std::cout << "Inference Time: " << result.inferenceTimeMs << " ms\n";
-        std::cout << "==========================\n";
+        return Detect(featureVec.data);
     }
 
-    // ==================== أدوات مساعدة ====================
+    AIDetectionResult AIDetector::ScanBehavior(const class ProcessAnalysisReport& report) {
+        FeatureExtractor extractor;
+        auto featureVec = extractor.ExtractFromBehavior(report);
 
-public:
-    bool isReady() const {
-        return isInitialized;
+        if (!featureVec.isValid) {
+            AIDetectionResult result;
+            result.isValid = false;
+            result.errorMessage = "Behavior feature extraction failed";
+            return result;
+        }
+
+        return Detect(featureVec.data);
     }
 
-    std::string getModelInfo() const {
+    bool AIDetector::ValidateInputShape(const std::vector<float>& input) const {
+        // السماح بأحجام مختلفة مع Resize تلقائي
+        return input.size() > 0 && input.size() <= m_inputSize * 2;
+    }
+
+    std::string AIDetector::CreateCacheKey(const std::vector<float>& features) const {
+        return VectorHash(features);
+    }
+
+    std::string AIDetector::VectorHash(const std::vector<float>& vec) {
+        // Hash بسيط باستخدام std::hash
+        std::hash<float> hasher;
+        size_t seed = 0;
+
+        for (float f : vec) {
+            // Combine hashes
+            seed ^= hasher(f) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        }
+
+        // Convert to string
         std::stringstream ss;
-        ss << "Model: " << modelPath << "\n";
-        ss << "Input Size: " << inputSize << " features\n";
-        ss << "Classes: " << outputSize << "\n";
+        ss << std::hex << seed;
         return ss.str();
     }
 
-    // تحديث النموذج في الوقت الفعلي
-    bool reloadModel(const std::string& newModelPath) {
+    void AIDetector::UpdateCache(const std::string& key, const AIDetectionResult& result) {
+        std::lock_guard<std::mutex> lock(m_cacheMutex);
+
+        // إزالة القديم إذا موجود
+        auto it = m_cache.find(key);
+        if (it != m_cache.end()) {
+            auto orderIt = std::find(m_cacheOrder.begin(), m_cacheOrder.end(), key);
+            if (orderIt != m_cacheOrder.end()) {
+                m_cacheOrder.erase(orderIt);
+            }
+        }
+
+        // إضافة جديد
+        m_cache[key] = result;
+        m_cacheOrder.push_back(key);
+
+        // إزالة الأقدم إذا تجاوزنا الحد
+        if (m_cache.size() > m_config.cacheSize) {
+            std::string oldest = m_cacheOrder.front();
+            m_cacheOrder.erase(m_cacheOrder.begin());
+            m_cache.erase(oldest);
+        }
+    }
+
+    bool AIDetector::CheckCache(const std::string& key, AIDetectionResult& result) {
+        std::lock_guard<std::mutex> lock(m_cacheMutex);
+
+        auto it = m_cache.find(key);
+        if (it != m_cache.end()) {
+            result = it->second;
+            return true;
+        }
+
+        return false;
+    }
+
+    void AIDetector::ClearCache() {
+        std::lock_guard<std::mutex> lock(m_cacheMutex);
+        m_cache.clear();
+        m_cacheOrder.clear();
+    }
+
+    AIDetector::PerformanceStats AIDetector::GetPerformanceStats() const {
+        std::lock_guard<std::mutex> lock(m_statsMutex);
+        return m_stats;
+    }
+
+    bool AIDetector::SaveFeedback(const std::vector<float>& features,
+        bool wasMalicious,
+        const std::string& filePath) {
+        // حفظ (Feature, Label) لإعادة التدريب المستقبلي
+        std::ofstream feedback("feedback.csv", std::ios::app);
+        if (!feedback.is_open()) return false;
+
+        // CSV Format: hash,feature1,feature2,...,label
+        std::string hash = VectorHash(features);
+        feedback << hash << ",";
+
+        for (size_t i = 0; i < features.size(); ++i) {
+            feedback << features[i];
+            if (i < features.size() - 1) feedback << ",";
+        }
+
+        feedback << "," << (wasMalicious ? "1" : "0") << "," << filePath << "\n";
+        return true;
+    }
+
+    std::vector<float> AIDetector::Softmax(const std::vector<float>& logits) {
+        std::vector<float> probs;
+        probs.reserve(logits.size());
+
+        float maxLogit = *std::max_element(logits.begin(), logits.end());
+        float sumExp = 0.0f;
+
+        for (float logit : logits) {
+            float expVal = std::exp(logit - maxLogit); // Numerical stability
+            probs.push_back(expVal);
+            sumExp += expVal;
+        }
+
+        for (float& p : probs) {
+            p /= sumExp;
+        }
+
+        return probs;
+    }
+
+    size_t AIDetector::ArgMax(const std::vector<float>& vec) {
+        return std::distance(vec.begin(), std::max_element(vec.begin(), vec.end()));
+    }
+
+    bool AIDetector::ValidateModelFile(const std::string& path) {
+        // التحقق من وجود الملف وحجمه
         try {
-            std::cout << "[INFO] Reloading model: " << newModelPath << "\n";
-            modelPath = newModelPath;
-            loadModel();
+            if (!fs::exists(path)) return false;
+
+            auto size = fs::file_size(path);
+            if (size < 1024 || size > 500 * 1024 * 1024) { // 1KB - 500MB
+                return false;
+            }
+
+            // TODO: التحقق من توقيع ONNX (Magic Bytes)
+            std::ifstream file(path, std::ios::binary);
+            if (!file.is_open()) return false;
+
+            // ONNX files start with specific bytes (TODO: Verify)
+
             return true;
         }
         catch (...) {
-            std::cerr << "[ERROR] Failed to reload model\n";
             return false;
         }
     }
 
-    // ==================== التعلم التكيفي (اختياري) ====================
-
-    void logFeedback(const std::string& fileHash,
-        bool wasTruePositive,
-        const std::string& correctClass) {
-        // تسجيل الأخطاء لتحسين النموذج لاحقاً
-        std::ofstream feedback("ai_feedback.log", std::ios::app);
-        auto now = std::chrono::system_clock::now();
-        auto time = std::chrono::system_clock::to_time_t(now);
-
-        feedback << std::ctime(&time);
-        feedback << "Hash: " << fileHash << "\n";
-        feedback << "Result: " << (wasTruePositive ? "Correct" : "False Positive") << "\n";
-        if (!correctClass.empty()) {
-            feedback << "Correct Class: " << correctClass << "\n";
-        }
-        feedback << "------------------------\n";
-
-        feedback.close();
-    }
-
-    // ==================== وضعيات التحليل ====================
-
-    // تحليل سريع (دقة أقل، سرعة أعلى)
-    DetectionResult quickScan(const std::vector<float>& features) {
-        // استخدام عينة من الميزات فقط
-        std::vector<float> sampled;
-        for (size_t i = 0; i < features.size(); i += 2) {
-            sampled.push_back(features[i]);
-        }
-        return predict(sampled);
-    }
-
-    // تحليل عميق (دقة أعلى، بطيء)
-    DetectionResult deepScan(const std::vector<float>& features) {
-        // تشغيل تحليل متعدد الزوايا
-        auto result1 = predict(features);
-
-        // تغيير ترتيب الميزات قليلاً (data augmentation)
-        std::vector<float> augmented = features;
-        std::rotate(augmented.begin(), augmented.begin() + 10, augmented.end());
-        auto result2 = predict(augmented);
-
-        // دمج النتائج
-        if (result1.confidence > result2.confidence) {
-            return result1;
-        }
-        return result2;
-    }
-};
-
-// ==================== نقطة الاختبار ====================
-
-#ifdef TEST_AI
-int main() {
-    std::cout << "AI Antivirus - Detector Test\n\n";
-
-    // البحث عن نموذج
-    std::string modelPath = "model.onnx";
-    if (!std::ifstream(modelPath)) {
-        std::cerr << "[ERROR] Model not found: " << modelPath << "\n";
-        std::cerr << "Please place 'model.onnx' in the application directory.\n";
-
-        // إنشاء بيانات اختبار وهمية
-        std::cout << "\nRunning in simulation mode...\n";
-
-        // محاكاة نتيجة
-        std::cout << "\n=== SIMULATED AI ANALYSIS ===\n";
-        std::cout << "Classification: ⚠️  THREAT DETECTED: Trojan\n";
-        std::cout << "Confidence: 87.5%\n";
-        std::cout << "Inference Time: 45 ms\n";
-
-        return 0;
-    }
-
-    AIDetector detector(modelPath);
-
-    if (!detector.isReady()) {
-        std::cerr << "Failed to initialize detector\n";
-        return 1;
-    }
-
-    std::cout << detector.getModelInfo() << "\n";
-
-    // إنشاء بيانات اختبار عشوائية
-    std::vector<float> testFeatures(280);
-    std::generate(testFeatures.begin(), testFeatures.end(), []() {
-        return static_cast<float>(rand()) / RAND_MAX;
-        });
-
-    // اختبار التنبؤ
-    auto result = detector.predict(testFeatures);
-
-    if (!result.isError) {
-        detector.displayResult(result);
-    }
-
-    return 0;
-}
-#endif
+} // namespace AIAntivirus

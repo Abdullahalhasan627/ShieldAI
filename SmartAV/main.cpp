@@ -1,307 +1,584 @@
-// main.cpp - AI Antivirus
-// نقطة البداية الرئيسية - النظام المتكامل
+﻿/**
+ * main.cpp
+ *
+ * نقطة الدخول الرئيسية - Application Entry Point
+ *
+ * المسؤوليات:
+ * - تحديد وضع التشغيل (Service vs GUI) بناءً على Arguments
+ * - تهيئة البنية التحتية المشتركة (Logging, Config, etc.)
+ * - توجيه التنفيذ إلى الوحدة المناسبة
+ * - معالجة الأخطاء العامة والاستثناءات
+ * - إدارة دورة حياة التطبيق بالكامل
+ *
+ * أوضاع التشغيل:
+ * 1. --service    : تشغيل كـ Windows Service (في الخلفية)
+ * 2. --gui        : تشغيل واجهة المستخدم (افتراضي إذا لم يُحدد)
+ * 3. --install    : تثبيت الخدمة
+ * 4. --uninstall  : إلغاء تثبيت الخدمة
+ * 5. --console    : تشغيل كـ Console App (للتصحيح)
+ * 6. --help       : عرض المساعدة
+ *
+ * متطلبات: C++17, Windows 10/11, Visual Studio 2022
+ */
 
-#include <iostream>
-#include <memory>
-#include <thread>
-#include <chrono>
+#include <windows.h>
+#include <shellapi.h>
 #include <string>
 #include <vector>
-#include <map>
-#include <windows.h>
-#include <filesystem>
+#include <iostream>
+#include <fstream>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
+#include <exception>
+#include <memory>
 
-// تضمين الوحدات (في المشروع الحقيقي استخدم header files)
-#include "Core/FileScanner.cpp"
-#include "Core/RealTimeMonitor.cpp"
-#include "Core/ProcessAnalyzer.cpp"
-#include "Core/FeatureExtractor.cpp"
-#include "AI/AIDetector.cpp"
-#include "Security/Quarantine.cpp"
-#include "Security/SelfProtection.cpp"
+ // تضمين الوحدات
+#include "Service/ServiceModule.h"
+#include "UI/MainWindow.h"
+#include "Security/SelfProtection.h"
 
-namespace fs = std::filesystem;
+#pragma comment(lib, "shell32.lib")
 
-// ==================== إعدادات النظام ====================
+// ==================== الإعدادات العامة ====================
 
-struct SystemConfig {
-    bool enableRealTimeProtection = true;
-    bool enableAI = true;
-    bool enableSelfProtection = true;
-    bool enableProcessMonitor = true;
-    int scanDepth = 2;  // 1=Quick, 2=Normal, 3=Deep
-    std::vector<std::string> protectedPaths;
-    std::string modelPath = "AI/model.onnx";
-};
+namespace AIAntivirus {
 
-// ==================== مدير النظام الرئيسي ====================
+    /**
+     * إعدادات التطبيق العامة
+     */
+    struct ApplicationConfig {
+        std::wstring appName = L"AI Antivirus";
+        std::wstring version = L"1.0.0";
+        std::wstring company = L"AI Security Solutions";
 
-class AIAntivirus {
-private:
-    // الوحدات الأساسية
-    std::unique_ptr<FileScanner> fileScanner;
-    std::unique_ptr<RealTimeMonitor> realTimeMonitor;
-    std::unique_ptr<ProcessAnalyzer> processAnalyzer;
-    std::unique_ptr<FeatureExtractor> featureExtractor;
-    std::unique_ptr<AIDetector> aiDetector;
-    std::unique_ptr<QuarantineManager> quarantine;
-    std::unique_ptr<SelfProtection> selfProtection;
+        // المسارات
+        std::wstring installDir = L"C:\\Program Files\\AIAntivirus\\";
+        std::wstring dataDir = L"C:\\ProgramData\\AIAntivirus\\";
+        std::wstring logDir = L"C:\\ProgramData\\AIAntivirus\\Logs\\";
+        std::wstring configFile = L"C:\\ProgramData\\AIAntivirus\\config.ini";
 
-    // التكوين
-    SystemConfig config;
-    bool isRunning = false;
-    bool isInitialized = false;
+        // إعدادات الخدمة
+        std::wstring serviceName = L"SmartAVService";
+        std::wstring serviceDisplayName = L"AI Antivirus Service";
+        std::wstring pipeName = L"\\\\.\\pipe\\SmartAV_Service";
 
-public:
-    AIAntivirus() {
-        std::cout << R"(
-    █████╗ ██╗      █████╗ ███╗   ██╗████████╗██╗██╗   ██╗██████╗ ██╗   ██╗███████╗
-   ██╔══██╗██║     ██╔══██╗████╗  ██║╚══██╔══╝██║██║   ██║██╔══██╗██║   ██║██╔════╝
-   ███████║██║     ███████║██╔██╗ ██║   ██║   ██║██║   ██║██████╔╝██║   ██║███████╗
-   ██╔══██║██║     ██╔══██║██║╚██╗██║   ██║   ██║╚██╗ ██╔╝██╔══██╗██║   ██║╚════██║
-   ██║  ██║███████╗██║  ██║██║ ╚████║   ██║   ██║ ╚████╔╝ ██║  ██║╚██████╔╝███████║
-   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
-        )" << "\n\n";
+        // إعدادات UI
+        bool startMinimized = false;
+        bool autoStartGUI = true;
+        std::string language = "ar";
+    };
 
-        std::cout << "Initializing AI Antivirus System...\n";
-        std::cout << "Version: 2.0.0-BETA\n";
-        std::cout << "Build Date: " << __DATE__ << " " << __TIME__ << "\n\n";
-    }
+    /**
+     * مدير التطبيق الرئيسي
+     */
+    class Application {
+    public:
+        static Application& GetInstance() {
+            static Application instance;
+            return instance;
+        }
 
-    ~AIAntivirus() {
-        shutdown();
-    }
+        Application(const Application&) = delete;
+        Application& operator=(const Application&) = delete;
 
-    // ==================== التهيئة ====================
+        /**
+         * نقطة الدخول الرئيسية
+         */
+        int Run(HINSTANCE hInstance, int nCmdShow, const std::vector<std::wstring>& args);
 
-    bool initialize(const SystemConfig& cfg = SystemConfig()) {
-        config = cfg;
+        /**
+         * الحصول على الإعدادات
+         */
+        ApplicationConfig& GetConfig() { return m_config; }
+
+        /**
+         * إيقاف التطبيق
+         */
+        void Shutdown(int exitCode = 0);
+
+        /**
+         * التحقق من وجود خدمة عاملة
+         */
+        bool IsServiceRunning();
+
+        /**
+         * الحصول على مسار التنفيذي
+         */
+        std::wstring GetExecutablePath() const;
+
+        /**
+         * الحصول على مجلد التثبيت
+         */
+        std::wstring GetInstallDirectory() const;
+
+    private:
+        Application() = default;
+        ~Application() = default;
+
+        ApplicationConfig m_config;
+        HINSTANCE m_hInstance;
+        int m_exitCode = 0;
+        bool m_running = false;
+
+        // ==================== أوضاع التشغيل ====================
+
+        int RunAsService();
+        int RunAsGUI(int nCmdShow);
+        int RunAsConsole();
+        int InstallService();
+        int UninstallService();
+        int ShowHelp();
+
+        // ==================== وظائف مساعدة ====================
+
+        bool ParseArguments(const std::vector<std::wstring>& args);
+        bool InitializeLogging();
+        bool CheckPrivileges();
+        void SetupCrashHandler();
+        void LogStartupInfo();
+
+        /**
+         * عرض رسالة خطأ
+         */
+        void ShowError(const std::wstring& title, const std::wstring& message);
+
+        /**
+         * عرض رسالة معلومات
+         */
+        void ShowInfo(const std::wstring& title, const std::wstring& message);
+    };
+
+    // ==================== Implementation ====================
+
+    int Application::Run(HINSTANCE hInstance, int nCmdShow,
+        const std::vector<std::wstring>& args) {
+        m_hInstance = hInstance;
+        m_running = true;
 
         try {
-            // 1. الحماية الذاتية أولاً (الأهم)
-            if (config.enableSelfProtection) {
-                std::cout << "[1/7] Initializing Self-Protection...\n";
-                selfProtection = std::make_unique<SelfProtection>();
-                if (!selfProtection->activate()) {
-                    std::cerr << "[WARNING] Self-protection limited\n";
+            // إعداد معالج الأعطال
+            SetupCrashHandler();
+
+            // تهيئة التسجيل
+            InitializeLogging();
+
+            // تسجيل بدء التشغيل
+            LogStartupInfo();
+
+            // تحليل Arguments
+            if (!ParseArguments(args)) {
+                return ShowHelp();
+            }
+
+            // التحقق من الصلاحيات عند الحاجة
+            if (args.empty() || (args.size() == 1 && args[0].find(L"--") != 0)) {
+                // وضع GUI الافتراضي - تحقق من وجود خدمة
+                if (!IsServiceRunning() && m_config.autoStartGUI) {
+                    // محاولة تشغيل الخدمة أو الانتقال إلى وضع محدود
+                    ShowInfo(L"تنبيه",
+                        L"الخدمة غير نشطة. بعض الميزات قد لا تعمل.\n"
+                        L"يرجى تشغيل الخدمة كمسؤول: --install ثم net start SmartAVService");
                 }
             }
 
-            // 2. الماسح الضوئي
-            std::cout << "[2/7] Loading File Scanner...\n";
-            fileScanner = std::make_unique<FileScanner>();
-
-            // 3. مستخرج الميزات
-            std::cout << "[3/7] Loading Feature Extractor...\n";
-            featureExtractor = std::make_unique<FeatureExtractor>();
-
-            // 4. الذكاء الاصطناعي
-            if (config.enableAI) {
-                std::cout << "[4/7] Loading AI Engine...\n";
-                aiDetector = std::make_unique<AIDetector>(config.modelPath);
-                if (!aiDetector->isReady()) {
-                    std::cerr << "[WARNING] AI Engine not available\n";
-                }
+            // توجيه التنفيذ حسب الوضع
+            if (args.empty()) {
+                // افتراضي: GUI
+                return RunAsGUI(nCmdShow);
             }
 
-            // 5. نظام الحجر الصحي
-            std::cout << "[5/7] Initializing Quarantine...\n";
-            quarantine = std::make_unique<QuarantineManager>();
+            const std::wstring& mode = args[0];
 
-            // 6. محلل العمليات
-            if (config.enableProcessMonitor) {
-                std::cout << "[6/7] Loading Process Analyzer...\n";
-                processAnalyzer = std::make_unique<ProcessAnalyzer>();
-                processAnalyzer->startMonitoring(5);
+            if (mode == L"--service") {
+                return RunAsService();
             }
-
-            // 7. المراقبة في الوقت الفعلي
-            if (config.enableRealTimeProtection) {
-                std::cout << "[7/7] Starting Real-Time Protection...\n";
-                realTimeMonitor = std::make_unique<RealTimeMonitor>();
-                setupRealTimeCallbacks();
-
-                // إضافة المسارات المحمية
-                setupProtectedPaths();
-
-                if (!realTimeMonitor->start()) {
-                    std::cerr << "[ERROR] Real-time protection failed to start\n";
-                }
+            else if (mode == L"--gui") {
+                return RunAsGUI(nCmdShow);
             }
-
-            isInitialized = true;
-            std::cout << "\n✅ System initialized successfully!\n\n";
-
-            showSystemStatus();
-
-            return true;
-
-        }
-        catch (const std::exception& e) {
-            std::cerr << "\n❌ Initialization failed: " << e.what() << "\n";
-            return false;
-        }
-    }
-
-    void shutdown() {
-        if (!isRunning) return;
-
-        std::cout << "\nShutting down AI Antivirus...\n";
-
-        if (realTimeMonitor) realTimeMonitor->stop();
-        if (processAnalyzer) processAnalyzer->stopMonitoring();
-        if (selfProtection) selfProtection->deactivate();
-
-        isRunning = false;
-        std::cout << "Goodbye!\n";
-    }
-
-    // ==================== الإعدادات والتكوين ====================
-
-private:
-    void setupRealTimeCallbacks() {
-        if (!realTimeMonitor) return;
-
-        // رد الاتصال عند اكتشاف ملف جديد
-        realTimeMonitor->setThreatCallback(
-            [this](const std::string& filePath) -> bool {
-                return handleNewFile(filePath);
+            else if (mode == L"--console") {
+                return RunAsConsole();
             }
-        );
-
-        // رد الاتصال لتسجيل الأحداث
-        realTimeMonitor->setEventCallback(
-            [this](const FileEvent& event) {
-                logEvent(event);
+            else if (mode == L"--install") {
+                return InstallService();
             }
-        );
-    }
-
-    void setupProtectedPaths() {
-        if (!realTimeMonitor) return;
-
-        // إضافة المسارات الحرجة
-        char userProfile[MAX_PATH];
-        GetEnvironmentVariableA("USERPROFILE", userProfile, MAX_PATH);
-
-        realTimeMonitor->addWatchPath(std::string(userProfile) + "\\Downloads");
-        realTimeMonitor->addWatchPath(std::string(userProfile) + "\\Desktop");
-        realTimeMonitor->addWatchPath(std::string(userProfile) + "\\Documents");
-
-        // Temp folders
-        char tempPath[MAX_PATH];
-        GetTempPathA(MAX_PATH, tempPath);
-        realTimeMonitor->addWatchPath(tempPath);
-
-        // إضافة المسارات المخصصة
-        for (const auto& path : config.protectedPaths) {
-            realTimeMonitor->addWatchPath(path);
-        }
-    }
-
-    // ==================== معالجة التهديدات ====================
-
-public:
-    bool handleNewFile(const std::string& filePath) {
-        std::cout << "\n🔍 New file detected: " << filePath << "\n";
-
-        // 1. فحص سريع بالماسح الضوئي
-        bool scannerThreat = fileScanner->scanSingleFile(filePath);
-
-        if (scannerThreat) {
-            std::cout << "⚠️  Traditional scanner detected threat!\n";
-            handleConfirmedThreat(filePath, "Heuristic Detection", 7);
-            return true;
-        }
-
-        // 2. تحليل AI (إذا كان متاحاً)
-        if (aiDetector && aiDetector->isReady()) {
-            auto features = featureExtractor->getFeatureVector(filePath);
-            auto result = aiDetector->predict(features);
-
-            if (!result.isError) {
-                aiDetector->displayResult(result);
-
-                // اتخاذ قرار بناءً على الثقة
-                if (result.confidence > 0.85f && result.threatClass != "Benign") {
-                    std::cout << "🤖 AI detected: " << result.threatClass << "\n";
-                    handleConfirmedThreat(filePath, result.threatClass,
-                        static_cast<int>(result.confidence * 10));
-                    return true;
-                }
-                else if (result.confidence > 0.6f && result.threatClass != "Benign") {
-                    std::cout << "⚡ Suspicious file (AI uncertain): "
-                        << result.threatClass << "\n";
-                    // مراقبة إضافية بدون عزل فوري
-                    monitorFile(filePath);
-                }
+            else if (mode == L"--uninstall") {
+                return UninstallService();
             }
-        }
-
-        // 3. فحص العمليات إذا كان ملف تنفيذي
-        if (filePath.find(".exe") != std::string::npos ||
-            filePath.find(".dll") != std::string::npos) {
-
-            // سيتم فحصه عند التشغيل عبر ProcessAnalyzer
-        }
-
-        std::cout << "✅ File appears clean\n";
-        return false;
-    }
-
-    void handleConfirmedThreat(const std::string& filePath,
-        const std::string& threatName,
-        int threatLevel) {
-        // عرض تنبيه
-        std::cerr << "\n╔══════════════════════════════════════════╗\n";
-        std::cerr << "║     🚨 THREAT DETECTED - ACTION TAKEN    ║\n";
-        std::cerr << "╠══════════════════════════════════════════╣\n";
-        std::cerr << "║ File: " << fs::path(filePath).filename().string() << "\n";
-        std::cerr << "║ Threat: " << threatName << "\n";
-        std::cerr << "║ Level: " << threatLevel << "/10\n";
-        std::cerr << "║ Action: QUARANTINE\n";
-        std::cerr << "╚══════════════════════════════════════════╝\n";
-
-        // عزل الملف
-        if (quarantine) {
-            if (quarantine->quarantineFile(filePath, threatName, threatLevel)) {
-                // نجاح العزل
-                showNotification("Threat Neutralized",
-                    "File has been quarantined: " + threatName);
+            else if (mode == L"--help" || mode == L"/?" || mode == L"-h") {
+                return ShowHelp();
             }
             else {
-                // فشل العزل - المحاولة البديلة
-                std::cerr << "⚠️  Quarantine failed! Attempting secure delete...\n";
-                secureDeleteFallback(filePath);
+                std::wcerr << L"Unknown argument: " << mode << std::endl;
+                return ShowHelp();
+            }
+        }
+        catch (const std::exception& e) {
+            std::string error = "Fatal error: ";
+            error += e.what();
+
+            std::wstring wError(error.begin(), error.end());
+            ShowError(L"خطأ فادح", wError);
+
+            return 1;
+        }
+        catch (...) {
+            ShowError(L"خطأ فادح", L"حدث خطأ غير معروف");
+            return 1;
+        }
+
+        return m_exitCode;
+    }
+
+    int Application::RunAsService() {
+        std::cout << "Starting as Windows Service..." << std::endl;
+
+        // التحقق من الصلاحيات
+        if (!CheckPrivileges()) {
+            std::cerr << "Service mode requires Administrator privileges!" << std::endl;
+            return 1;
+        }
+
+        // تهيئة Self-Protection فوراً
+        auto& selfProtection = SelfProtection::GetInstance();
+        SelfProtectionConfig spConfig;
+        spConfig.protectService = true;
+        spConfig.protectFiles = true;
+        spConfig.antiDebugging = true;
+        spConfig.autoRestart = true;
+
+        if (!selfProtection.Initialize(spConfig)) {
+            std::cerr << "Failed to initialize self-protection!" << std::endl;
+            // استمرر بدون حماية ذاتية (غير مستحسن)
+        }
+        else {
+            selfProtection.EnableProtection();
+        }
+
+        // تسجيل معالج التحكم في الخدمة
+        SERVICE_TABLE_ENTRYW dispatchTable[] = {
+            { const_cast<LPWSTR>(m_config.serviceName.c_str()),
+              ServiceModule::ServiceMain },
+            { NULL, NULL }
+        };
+
+        // هذا الاستدعاء لا يعود حتى تتوقف الخدمة
+        if (!StartServiceCtrlDispatcherW(dispatchTable)) {
+            DWORD error = GetLastError();
+
+            if (error == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
+                // لم يتم تشغيله من SCM
+                std::cerr << "Not running as a service. Use --console for debugging." << std::endl;
+                return 1;
+            }
+
+            std::cerr << "StartServiceCtrlDispatcher failed: " << error << std::endl;
+            return 1;
+        }
+
+        return 0;
+    }
+
+    int Application::RunAsGUI(int nCmdShow) {
+        std::cout << "Starting GUI..." << std::endl;
+
+        // التحقق من وجود نسخة أخرى
+        HANDLE hMutex = CreateMutexW(NULL, TRUE, L"AI_Antivirus_GUI_SingleInstance");
+        if (GetLastError() == ERROR_ALREADY_EXISTS) {
+            // تفعيل النافذة الموجودة
+            HWND hWnd = FindWindowW(L"AI_Antivirus_MainWindow", NULL);
+            if (hWnd) {
+                ShowWindow(hWnd, SW_RESTORE);
+                SetForegroundWindow(hWnd);
+            }
+            return 0;
+        }
+
+        // تهيئة النافذة
+        MainWindow window;
+        UIConfig uiConfig;
+        uiConfig.startMinimized = m_config.startMinimized;
+        uiConfig.language = m_config.language;
+        window.SetConfig(uiConfig);
+
+        if (!window.Initialize(m_hInstance, nCmdShow)) {
+            ShowError(L"خطأ في التشغيل", L"فشل في تهيئة واجهة المستخدم");
+            return 1;
+        }
+
+        // حلقة الرسائل
+        int result = window.Run();
+
+        // تنظيف
+        if (hMutex) {
+            ReleaseMutex(hMutex);
+            CloseHandle(hMutex);
+        }
+
+        return result;
+    }
+
+    int Application::RunAsConsole() {
+        // فتح Console إذا لم يكن مفتوحاً
+        if (!AttachConsole(ATTACH_PARENT_PROCESS)) {
+            AllocConsole();
+        }
+
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
+        freopen("CONIN$", "r", stdin);
+
+        std::cout << "========================================" << std::endl;
+        std::cout << "  AI Antivirus - Console Debug Mode" << std::endl;
+        std::cout << "  Version: 1.0.0" << std::endl;
+        std::cout << "========================================" << std::endl;
+        std::cout << std::endl;
+
+        // التحقق من الصلاحيات
+        if (!CheckPrivileges()) {
+            std::cout << "WARNING: Running without Administrator privileges!" << std::endl;
+            std::cout << "Some features may not work correctly." << std::endl << std::endl;
+        }
+
+        // عرض قائمة الأوامر
+        std::cout << "Available commands:" << std::endl;
+        std::cout << "  1. start-service    - Start service components" << std::endl;
+        std::cout << "  2. quick-scan       - Run quick scan" << std::endl;
+        std::cout << "  3. full-scan        - Run full scan" << std::endl;
+        std::cout << "  4. status           - Show protection status" << std::endl;
+        std::cout << "  5. test-ai          - Test AI detection" << std::endl;
+        std::cout << "  6. exit             - Exit console" << std::endl;
+        std::cout << std::endl;
+
+        // حلقة الأوامر
+        std::string command;
+        bool serviceStarted = false;
+
+        while (true) {
+            std::cout << "AI-AV> ";
+            std::getline(std::cin, command);
+
+            if (command == "exit" || command == "quit") {
+                break;
+            }
+            else if (command == "start-service") {
+                if (serviceStarted) {
+                    std::cout << "Service already running!" << std::endl;
+                    continue;
+                }
+
+                std::cout << "Initializing service components..." << std::endl;
+
+                auto& service = ServiceModule::GetInstance();
+                if (service.Initialize()) {
+                    serviceStarted = true;
+                    std::cout << "Service started successfully!" << std::endl;
+                }
+                else {
+                    std::cout << "Failed to start service!" << std::endl;
+                }
+            }
+            else if (command == "quick-scan") {
+                if (!serviceStarted) {
+                    std::cout << "Please start service first!" << std::endl;
+                    continue;
+                }
+
+                std::cout << "Starting quick scan..." << std::endl;
+
+                auto& service = ServiceModule::GetInstance();
+                if (service.StartScan(ScanType::QUICK)) {
+                    std::cout << "Quick scan started." << std::endl;
+
+                    // انتظار النتيجة (blocking للتبسيط)
+                    while (service.GetScanStatus().isScanning) {
+                        std::this_thread::sleep_for(std::chrono::seconds(1));
+                        std::cout << "." << std::flush;
+                    }
+                    std::cout << std::endl << "Scan completed!" << std::endl;
+                }
+            }
+            else if (command == "full-scan") {
+                std::cout << "Full scan would start here..." << std::endl;
+            }
+            else if (command == "status") {
+                if (!serviceStarted) {
+                    std::cout << "Service not running." << std::endl;
+                }
+                else {
+                    auto stats = ServiceModule::GetInstance().GetStatistics();
+                    std::cout << "Files scanned: " << stats.totalFilesScanned << std::endl;
+                    std::cout << "Threats blocked: " << stats.totalThreatsBlocked << std::endl;
+                    std::cout << "Uptime: " << stats.uptimeHours << " hours" << std::endl;
+                }
+            }
+            else if (command == "test-ai") {
+                std::cout << "Testing AI detection..." << std::endl;
+                // TODO: اختبار سريع
+            }
+            else if (!command.empty()) {
+                std::cout << "Unknown command: " << command << std::endl;
             }
         }
 
-        // تسجيل الحدث
-        logThreat(filePath, threatName, threatLevel);
+        // إيقاف الخدمة إذا كانت عاملة
+        if (serviceStarted) {
+            std::cout << "Shutting down service..." << std::endl;
+            ServiceModule::GetInstance().Shutdown();
+        }
+
+        std::cout << "Goodbye!" << std::endl;
+
+        // إغلاق Console
+        FreeConsole();
+
+        return 0;
     }
 
-    void monitorFile(const std::string& filePath) {
-        // إضافة للمراقبة المشددة
-        std::cout << "[MONITOR] Added to watch list: " << filePath << "\n";
+    int Application::InstallService() {
+        std::cout << "Installing service..." << std::endl;
 
-        // يمكن إضافة منطق إضافي هنا
-    }
+        if (!CheckPrivileges()) {
+            // محاولة رفع الصلاحيات
+            std::wstring exePath = GetExecutablePath();
+            std::wstring params = L"--install";
 
-    bool secureDeleteFallback(const std::string& filePath) {
-        // حذف آمن كحل أخير
-        try {
-            // الكتابة فوق الملف
-            std::ofstream file(filePath, std::ios::binary | std::ios::trunc);
-            std::vector<char> zeros(4096, 0);
-            for (int i = 0; i < 10; i++) {
-                file.write(zeros.data(), zeros.size());
+            SHELLEXECUTEINFOW sei = { 0 };
+            sei.cbSize = sizeof(sei);
+            sei.lpVerb = L"runas"; // UAC prompt
+            sei.lpFile = exePath.c_str();
+            sei.lpParameters = params.c_str();
+            sei.nShow = SW_NORMAL;
+
+            if (ShellExecuteExW(&sei)) {
+                return 0; // سيتم إعادة التشغيل كمسؤول
             }
-            file.close();
+            else {
+                ShowError(L"خطأ", L"يتطلب التثبيت صلاحيات المسؤول");
+                return 1;
+            }
+        }
 
-            // إعادة تسمية ثم حذف
-            std::string tempName = filePath + ".tmp";
-            fs::rename(filePath, tempName);
-            fs::remove(tempName);
+        ServiceConfig svcConfig;
+        svcConfig.serviceName = m_config.serviceName;
+        svcConfig.displayName = m_config.serviceDisplayName;
+        svcConfig.startType = SERVICE_AUTO_START;
+        svcConfig.autoRestart = true;
+
+        if (ServiceModule::Install(svcConfig)) {
+            std::cout << "Service installed successfully!" << std::endl;
+            std::cout << "Use 'net start " << std::string(m_config.serviceName.begin(),
+                m_config.serviceName.end())
+                << "' to start the service." << std::endl;
+
+            ShowInfo(L"تم التثبيت",
+                L"تم تثبيت الخدمة بنجاح.\n"
+                L"استخدم: net start SmartAVService\n"
+                L"لبدء الخدمة");
+            return 0;
+        }
+        else {
+            std::cerr << "Failed to install service!" << std::endl;
+            ShowError(L"خطأ", L"فشل في تثبيت الخدمة");
+            return 1;
+        }
+    }
+
+    int Application::UninstallService() {
+        std::cout << "Uninstalling service..." << std::endl;
+
+        if (!CheckPrivileges()) {
+            // محاولة رفع الصلاحيات
+            std::wstring exePath = GetExecutablePath();
+            std::wstring params = L"--uninstall";
+
+            SHELLEXECUTEINFOW sei = { 0 };
+            sei.cbSize = sizeof(sei);
+            sei.lpVerb = L"runas";
+            sei.lpFile = exePath.c_str();
+            sei.lpParameters = params.c_str();
+            sei.nShow = SW_NORMAL;
+
+            if (ShellExecuteExW(&sei)) {
+                return 0;
+            }
+            else {
+                ShowError(L"خطأ", L"يتطلب الإلغاء صلاحيات المسؤول");
+                return 1;
+            }
+        }
+
+        if (ServiceModule::Uninstall(m_config.serviceName)) {
+            std::cout << "Service uninstalled successfully!" << std::endl;
+            ShowInfo(L"تم الإلغاء", L"تم إلغاء تثبيت الخدمة بنجاح");
+            return 0;
+        }
+        else {
+            std::cerr << "Failed to uninstall service (may not exist)!" << std::endl;
+            return 1;
+        }
+    }
+
+    int Application::ShowHelp() {
+        const wchar_t* helpText = LR"(
+AI Antivirus - نظام الحماية الذكي
+=====================================
+
+Usage: SmartAV.exe [option]
+
+Options:
+  --service      تشغيل كـ Windows Service (في الخلفية)
+  --gui          تشغيل واجهة المستخدم (الافتراضي)
+  --console      تشغيل وضع Console للتصحيح
+  --install      تثبيت الخدمة (يحتاج Admin)
+  --uninstall    إلغاء تثبيت الخدمة (يحتاج Admin)
+  --help         عرض هذه المساعدة
+
+Examples:
+  SmartAV.exe                    تشغيل الواجهة
+  SmartAV.exe --install          تثبيت الخدمة
+  net start SmartAVService       بدء الخدمة
+  SmartAV.exe --console          وضع التصحيح
+
+For support: support@ai-antivirus.com
+)";
+
+        // إظهار في Console إذا كان متاحاً
+        if (AttachConsole(ATTACH_PARENT_PROCESS) || AllocConsole()) {
+            std::wcout << helpText << std::endl;
+            FreeConsole();
+        }
+        else {
+            // إظهار في MessageBox
+            MessageBoxW(NULL, helpText, L"AI Antivirus - Help", MB_OK | MB_ICONINFORMATION);
+        }
+
+        return 0;
+    }
+
+    bool Application::ParseArguments(const std::vector<std::wstring>& args) {
+        // TODO: تحليل إعدادات متقدمة من Arguments
+        // مثل: --config path\to\config.ini
+        //      --lang en
+        //      --minimized
+
+        return true;
+    }
+
+    bool Application::InitializeLogging() {
+        try {
+            // إنشاء مجلد Logs
+            CreateDirectoryW(m_config.logDir.c_str(), NULL);
+
+            // ملف Log رئيسي
+            auto now = std::chrono::system_clock::now();
+            auto time_t = std::chrono::system_clock::to_time_t(now);
+
+            std::wstringstream ss;
+            ss << m_config.logDir << L"application_"
+                << std::put_time(std::localtime(&time_t), L"%Y%m%d") << L".log";
+
+            // TODO: إعداد نظام تسجيل أكثر تطوراً (مثل spdlog)
 
             return true;
         }
@@ -310,371 +587,115 @@ public:
         }
     }
 
-    // ==================== أوامر المستخدم ====================
+    bool Application::CheckPrivileges() {
+        BOOL elevated = FALSE;
+        HANDLE hToken = NULL;
 
-public:
-    void runInteractive() {
-        if (!isInitialized) {
-            std::cerr << "System not initialized!\n";
-            return;
-        }
-
-        isRunning = true;
-
-        std::cout << "\n╔══════════════════════════════════════════╗\n";
-        std::cout << "║     AI Antivirus Command Interface       ║\n";
-        std::cout << "╚══════════════════════════════════════════╝\n\n";
-
-        std::string command;
-
-        while (isRunning) {
-            std::cout << "\n[AI-AV] > ";
-            std::getline(std::cin, command);
-
-            processCommand(command);
-        }
-    }
-
-    void processCommand(const std::string& command) {
-        std::vector<std::string> args;
-        std::stringstream ss(command);
-        std::string arg;
-
-        while (ss >> arg) {
-            args.push_back(arg);
-        }
-
-        if (args.empty()) return;
-
-        std::string cmd = args[0];
-        std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::tolower);
-
-        if (cmd == "scan" || cmd == "s") {
-            if (args.size() < 2) {
-                std::cout << "Usage: scan <path>\n";
-                return;
+        if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+            TOKEN_Elevation elevation;
+            DWORD size;
+            if (GetTokenInformation(hToken, TokenElevation, &elevation,
+                sizeof(elevation), &size)) {
+                elevated = elevation.TokenIsElevated;
             }
-            performScan(args[1]);
+            CloseHandle(hToken);
+        }
 
-        }
-        else if (cmd == "quick") {
-            performQuickScan();
-
-        }
-        else if (cmd == "full") {
-            performFullScan();
-
-        }
-        else if (cmd == "status" || cmd == "st") {
-            showSystemStatus();
-
-        }
-        else if (cmd == "quarantine" || cmd == "q") {
-            showQuarantine();
-
-        }
-        else if (cmd == "restore" && args.size() > 1) {
-            restoreFile(args[1]);
-
-        }
-        else if (cmd == "delete" && args.size() > 1) {
-            deleteQuarantined(args[1]);
-
-        }
-        else if (cmd == "processes" || cmd == "ps") {
-            showProcesses();
-
-        }
-        else if (cmd == "realtime" || cmd == "rt") {
-            toggleRealTime();
-
-        }
-        else if (cmd == "update") {
-            checkUpdates();
-
-        }
-        else if (cmd == "help" || cmd == "?") {
-            showHelp();
-
-        }
-        else if (cmd == "exit" || cmd == "quit") {
-            shutdown();
-
-        }
-        else {
-            std::cout << "Unknown command. Type 'help' for available commands.\n";
-        }
+        return elevated == TRUE;
     }
 
-    // ==================== وظائف الفحص ====================
-
-    void performScan(const std::string& path) {
-        std::cout << "\n📂 Starting scan: " << path << "\n";
-        std::cout << "Mode: " << (config.scanDepth == 3 ? "Deep" :
-            config.scanDepth == 2 ? "Normal" : "Quick") << "\n";
-        std::cout << "AI Engine: " << (aiDetector && aiDetector->isReady() ?
-            "Enabled" : "Disabled") << "\n\n";
-
-        if (!fs::exists(path)) {
-            std::cerr << "Path not found: " << path << "\n";
-            return;
-        }
-
-        if (fs::is_directory(path)) {
-            fileScanner->scanDirectory(path);
-        }
-        else {
-            fileScanner->scanSingleFile(path);
-        }
-
-        // عرض النتائج
-        auto infected = fileScanner->getInfectedFiles();
-        if (!infected.empty()) {
-            std::cout << "\n⚠️  Scan complete. " << infected.size()
-                << " threats found.\n";
-
-            for (const auto& file : infected) {
-                // AI analysis للملفات المكتشفة
-                if (aiDetector && aiDetector->isReady()) {
-                    auto features = featureExtractor->getFeatureVector(file);
-                    auto result = aiDetector->predict(features);
-
-                    handleConfirmedThreat(file, result.threatClass,
-                        static_cast<int>(result.confidence * 10));
-                }
-            }
-        }
-        else {
-            std::cout << "\n✅ Scan complete. No threats found.\n";
-        }
-
-        fileScanner->exportReport("scan_report.txt");
+    void Application::SetupCrashHandler() {
+        // TODO: إعداد معالج أعطال شامل (Exception Handler)
+        // يمكن استخدام Google Breakpad أو Crashpad
     }
 
-    void performQuickScan() {
-        char userProfile[MAX_PATH];
-        GetEnvironmentVariableA("USERPROFILE", userProfile, MAX_PATH);
+    void Application::LogStartupInfo() {
+        // تسجيل معلومات بدء التشغيل
+        std::wstring exePath = GetExecutablePath();
+        std::wstring cmdLine = GetCommandLineW();
 
-        std::cout << "\n⚡ Quick Scan started...\n";
-        performScan(std::string(userProfile) + "\\Downloads");
+        // TODO: كتابة في Log
     }
 
-    void performFullScan() {
-        std::cout << "\n🔍 Full System Scan started...\n";
-        std::cout << "This may take a while...\n";
-
-        // فحص جميع محركات الأقراص
-        DWORD drives = GetLogicalDrives();
-        for (int i = 0; i < 26; i++) {
-            if (drives & (1 << i)) {
-                char drive[4] = { 'A' + i, ':', '\\', '\0' };
-                UINT type = GetDriveTypeA(drive);
-
-                if (type == DRIVE_FIXED || type == DRIVE_REMOVABLE) {
-                    std::cout << "\nScanning drive: " << drive << "\n";
-                    performScan(drive);
-                }
-            }
-        }
+    void Application::ShowError(const std::wstring& title, const std::wstring& message) {
+        MessageBoxW(NULL, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR);
     }
 
-    // ==================== عرض المعلومات ====================
+    void Application::ShowInfo(const std::wstring& title, const std::wstring& message) {
+        MessageBoxW(NULL, message.c_str(), title.c_str(), MB_OK | MB_ICONINFORMATION);
+    }
 
-    void showSystemStatus() {
-        std::cout << "\n╔══════════════════════════════════════════╗\n";
-        std::cout << "║         SYSTEM STATUS                    ║\n";
-        std::cout << "╠══════════════════════════════════════════╣\n";
+    bool Application::IsServiceRunning() {
+        SC_HANDLE hSCM = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+        if (!hSCM) return false;
 
-        std::cout << "║ Self-Protection:  "
-            << (selfProtection && selfProtection->isProtectionActive() ?
-                "🟢 ACTIVE" : "🔴 INACTIVE") << "\n";
-
-        std::cout << "║ Real-Time Monitor: "
-            << (realTimeMonitor && realTimeMonitor->isActive() ?
-                "🟢 ACTIVE" : "🔴 INACTIVE") << "\n";
-
-        std::cout << "║ AI Engine:         "
-            << (aiDetector && aiDetector->isReady() ?
-                "🟢 READY" : "🟡 UNAVAILABLE") << "\n";
-
-        std::cout << "║ Process Monitor:   "
-            << (processAnalyzer ? "🟢 ACTIVE" : "🔴 INACTIVE") << "\n";
-
-        std::cout << "║ Quarantine:        "
-            << (quarantine ? "🟢 READY" : "🔴 ERROR") << "\n";
-
-        if (realTimeMonitor) {
-            auto paths = realTimeMonitor->getWatchedPaths();
-            std::cout << "║ Watched Paths:     " << paths.size() << "\n";
+        SC_HANDLE hService = OpenServiceW(hSCM, m_config.serviceName.c_str(), SERVICE_QUERY_STATUS);
+        if (!hService) {
+            CloseServiceHandle(hSCM);
+            return false;
         }
 
-        std::cout << "╚══════════════════════════════════════════╝\n";
+        SERVICE_STATUS status;
+        BOOL result = QueryServiceStatus(hService, &status);
+
+        CloseServiceHandle(hService);
+        CloseServiceHandle(hSCM);
+
+        return result && (status.dwCurrentState == SERVICE_RUNNING);
     }
 
-    void showQuarantine() {
-        if (quarantine) {
-            quarantine->showQuarantineList();
+    std::wstring Application::GetExecutablePath() const {
+        WCHAR path[MAX_PATH];
+        GetModuleFileNameW(NULL, path, MAX_PATH);
+        return path;
+    }
+
+    std::wstring Application::GetInstallDirectory() const {
+        std::wstring exePath = GetExecutablePath();
+        size_t pos = exePath.find_last_of(L"\\/");
+        if (pos != std::wstring::npos) {
+            return exePath.substr(0, pos);
         }
+        return exePath;
     }
 
-    void showProcesses() {
-        if (processAnalyzer) {
-            processAnalyzer->showProcessTree();
-
-            auto threats = processAnalyzer->getThreats(5);
-            if (!threats.empty()) {
-                std::cout << "\n⚠️  Active process threats detected: "
-                    << threats.size() << "\n";
-            }
-        }
+    void Application::Shutdown(int exitCode) {
+        m_exitCode = exitCode;
+        m_running = false;
     }
 
-    void showHelp() {
-        std::cout << "\n╔══════════════════════════════════════════╗\n";
-        std::cout << "║           AVAILABLE COMMANDS             ║\n";
-        std::cout << "╠══════════════════════════════════════════╣\n";
-        std::cout << "║ scan <path>    - Scan specific path      ║\n";
-        std::cout << "║ quick          - Quick scan Downloads    ║\n";
-        std::cout << "║ full           - Full system scan        ║\n";
-        std::cout << "║ status         - Show system status      ║\n";
-        std::cout << "║ quarantine     - List quarantined files  ║\n";
-        std::cout << "║ restore <id>   - Restore quarantined file║\n";
-        std::cout << "║ delete <id>    - Delete quarantined file ║\n";
-        std::cout << "║ processes      - Show process tree       ║\n";
-        std::cout << "║ realtime       - Toggle real-time protection║\n";
-        std::cout << "║ update         - Check for updates       ║\n";
-        std::cout << "║ help           - Show this help          ║\n";
-        std::cout << "║ exit           - Shutdown system         ║\n";
-        std::cout << "╚══════════════════════════════════════════╝\n";
+} // namespace AIAntivirus
+
+// ==================== WinMain (GUI) ====================
+
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+    LPWSTR lpCmdLine, int nCmdShow) {
+    UNREFERENCED_PARAMETER(hPrevInstance);
+
+    // تحويل Command Line إلى Vector
+    int argc;
+    LPWSTR* argv = CommandLineToArgvW(lpCmdLine, &argc);
+
+    std::vector<std::wstring> args;
+    for (int i = 0; i < argc; i++) {
+        args.push_back(argv[i]);
+    }
+    LocalFree(argv);
+
+    // تشغيل التطبيق
+    return AIAntivirus::Application::GetInstance().Run(hInstance, nCmdShow, args);
+}
+
+// ==================== main (Console) ====================
+
+int wmain(int argc, wchar_t* argv[]) {
+    std::vector<std::wstring> args;
+    for (int i = 1; i < argc; i++) {
+        args.push_back(argv[i]);
     }
 
-    // ==================== أوامر الحجر الصحي ====================
+    // في Console mode، نستخدم GetModuleHandle(NULL) للـ HINSTANCE
+    HINSTANCE hInstance = GetModuleHandle(NULL);
 
-    void restoreFile(const std::string& itemId) {
-        if (!quarantine) return;
-
-        if (quarantine->restoreFile(itemId)) {
-            std::cout << "✅ File restored successfully\n";
-        }
-        else {
-            std::cerr << "❌ Failed to restore file\n";
-        }
-    }
-
-    void deleteQuarantined(const std::string& itemId) {
-        if (!quarantine) return;
-
-        std::cout << "Are you sure? This cannot be undone. (yes/no): ";
-        std::string confirm;
-        std::getline(std::cin, confirm);
-
-        if (confirm == "yes") {
-            if (quarantine->deletePermanently(itemId)) {
-                std::cout << "✅ File permanently deleted\n";
-            }
-        }
-    }
-
-    void toggleRealTime() {
-        if (!realTimeMonitor) return;
-
-        if (realTimeMonitor->isActive()) {
-            realTimeMonitor->pause();
-            std::cout << "⏸️  Real-time protection paused\n";
-        }
-        else {
-            realTimeMonitor->resume();
-            std::cout << "▶️  Real-time protection resumed\n";
-        }
-    }
-
-    // ==================== التحديثات ====================
-
-    void checkUpdates() {
-        std::cout << "\n🔄 Checking for updates...\n";
-        std::cout << "Current version: 2.0.0-BETA\n";
-        std::cout << "Update server: https://ai-antivirus.example.com\n";
-        std::cout << "Status: Up to date (simulated)\n";
-    }
-
-    // ==================== التسجيل والإشعارات ====================
-
-private:
-    void logEvent(const FileEvent& event) {
-        // تسجيل في ملف السجل
-        std::ofstream log("ai_antivirus.log", std::ios::app);
-        auto now = std::chrono::system_clock::now();
-        auto time = std::chrono::system_clock::to_time_t(now);
-
-        log << "[" << std::ctime(&time) << "] ";
-        log << "Event: " << static_cast<int>(event.type) << " | ";
-        log << "Path: " << event.filePath << "\n";
-    }
-
-    void logThreat(const std::string& filePath,
-        const std::string& threatName,
-        int level) {
-        std::ofstream log("threats.log", std::ios::app);
-        auto now = std::chrono::system_clock::now();
-        auto time = std::chrono::system_clock::to_time_t(now);
-
-        log << "[" << std::ctime(&time) << "] ";
-        log << "THREAT: " << threatName << " | ";
-        log << "Level: " << level << " | ";
-        log << "File: " << filePath << "\n";
-    }
-
-    void showNotification(const std::string& title,
-        const std::string& message) {
-        // Windows notification (يمكن استخدام Toast API)
-        MessageBoxA(NULL, message.c_str(), title.c_str(),
-            MB_OK | MB_ICONWARNING | MB_TOPMOST);
-    }
-};
-
-// ==================== نقطة البداية ====================
-
-int main(int argc, char* argv[]) {
-    // إعداد وحدة التحكم
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleTitleA("AI Antivirus - Advanced Threat Protection");
-
-    // تكوين النظام
-    SystemConfig config;
-    config.enableRealTimeProtection = true;
-    config.enableAI = true;
-    config.enableSelfProtection = true;
-    config.enableProcessMonitor = true;
-
-    // قراءة المعاملات من سطر الأوامر
-    if (argc > 1) {
-        std::string arg = argv[1];
-
-        if (arg == "--service" || arg == "-s") {
-            // وضع الخدمة (بدون واجهة)
-            config.enableSelfProtection = true;
-            // تشغيل في الخلفية...
-        }
-        else if (arg == "--scan" && argc > 2) {
-            // فحص سريع من سطر الأوامر
-            AIAntivirus av;
-            if (av.initialize(config)) {
-                // av.performScan(argv[2]);
-            }
-            return 0;
-        }
-    }
-
-    // التشغيل التفاعلي العادي
-    AIAntivirus antivirus;
-
-    if (!antivirus.initialize(config)) {
-        std::cerr << "\n❌ Failed to initialize system. Exiting.\n";
-        return 1;
-    }
-
-    // تشغيل الواجهة التفاعلية
-    antivirus.runInteractive();
-
-    return 0;
+    return AIAntivirus::Application::GetInstance().Run(hInstance, SW_SHOW, args);
 }
