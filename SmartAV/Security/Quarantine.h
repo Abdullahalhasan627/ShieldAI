@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <mutex>
 
 namespace AIAntivirus {
 
@@ -33,22 +34,21 @@ namespace AIAntivirus {
         bool Initialize(const QuarantineConfig& config = QuarantineConfig{});
         void Shutdown();
 
-        QuarantineResult QuarantineFile(const std::wstring& filePath,
-            const std::string& threatName,
-            const std::string& detectionMethod,
-            float threatScore,
-            QuarantineEntry* outEntry = nullptr);
+        QuarantineResult QuarantineFile(const std::wstring& filePath, const std::wstring& threatName);
+        QuarantineResult RestoreFile(const std::wstring& quarantinePath);
+        QuarantineResult DeletePermanently(const std::wstring& quarantinePath);
 
-        QuarantineResult RestoreFile(const std::wstring& quarantineId,
-            const std::wstring& destinationPath = L"");
-        QuarantineResult DeletePermanently(const std::wstring& quarantineId, bool secureDelete = true);
-
-        std::vector<QuarantineEntry> GetQuarantinedFiles();
-        bool FindEntry(const std::wstring& quarantineId, QuarantineEntry& entry);
+        std::vector<QuarantineEntry> GetQuarantinedFiles() const;
+        size_t GetQuarantineCount() const;
 
     private:
         QuarantineManager() = default;
         ~QuarantineManager() = default;
+        
+        QuarantineConfig m_config;
+        bool m_isInitialized = false;
+        std::vector<QuarantineEntry> m_entries;
+        mutable std::mutex m_entriesMutex;
     };
 
 } // namespace AIAntivirus

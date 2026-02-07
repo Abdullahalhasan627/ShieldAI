@@ -1,0 +1,23 @@
+# SmartAV Malware Signature Database
+# Format: SHA256_HASH|THREAT_NAME|SEVERITY
+# Severity: 1=Low, 2=Medium, 3=High, 4=Critical
+
+# Known Malware Hashes (Examples - Add real hashes here)
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855|EICAR.Test.File|1
+44d88612fea8a8f36de82e1278abb02f|EICAR.Test.Standard|1
+275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f|Trojan.Generic.Test|3
+
+# Ransomware Signatures
+84c82835a5d21bbcf75a61706d8ab549|Ransomware.WannaCry|4
+ed01ebfbc9eb5bbea545af4d01bf5f1071661840480439c6e5babe8e080e41aa|Ransomware.Petya|4
+
+# Trojan Signatures  
+b91c6c1c0c6dd5d8f78b2b5c0a0f3d4e|Trojan.Emotet|4
+c4b2fc87e51d4f3e6c5c6e3a8d9b1a2f|Trojan.TrickBot|4
+
+# Spyware Signatures
+d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0|Spyware.Keylogger|3
+a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6|Spyware.InfoStealer|3
+
+# Adware Signatures
+1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d|Adware.Generic|2

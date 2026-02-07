@@ -28,10 +28,27 @@ namespace AIAntivirus {
 
         bool CreateUI();
         void OnPaint();
+        void ResizeControls(int width, int height);
 
+        // Main handles
         HWND m_hWnd = NULL;
         HINSTANCE m_hInstance = NULL;
         UIConfig m_config;
+        std::wstring m_customScanPath;
+        std::wstring m_currentScanningFile;
+
+        // Control handles for responsive layout
+        HWND m_hBtnQuickScan = NULL;
+        HWND m_hBtnFullScan = NULL;
+        HWND m_hBtnCustomScan = NULL;
+        HWND m_hBtnStopScan = NULL;
+        HWND m_hStatusText = NULL;
+        HWND m_hProgress = NULL;
+        HWND m_hScanList = NULL;
+        HWND m_hBtnQuarantine = NULL;
+        HWND m_hBtnProtection = NULL;
+        HWND m_hBtnSettings = NULL;
+        HWND m_hBtnUpdate = NULL;
     };
 
 } // namespace AIAntivirus
