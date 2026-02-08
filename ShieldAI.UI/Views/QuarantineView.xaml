@@ -1,0 +1,93 @@
+<UserControl x:Class="ShieldAI.UI.Views.QuarantineView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="800">
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <!-- العنوان -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,24">
+            <TextBlock Text="الحجر الصحي" Style="{StaticResource HeaderStyle}"/>
+            <TextBlock Text="الملفات المعزولة للحماية من التهديدات" 
+                       Style="{StaticResource BodyStyle}"
+                       Margin="0,8,0,0"/>
+        </StackPanel>
+        
+        <!-- قائمة الملفات المحجورة -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}">
+            <Grid>
+                <ListView ItemsSource="{Binding QuarantinedFiles}"
+                          Style="{StaticResource ModernListViewStyle}"
+                          ItemContainerStyle="{StaticResource ModernListViewItemStyle}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="الملف" Width="200" 
+                                            DisplayMemberBinding="{Binding OriginalName}"/>
+                            
+                            <GridViewColumn Header="المسار الأصلي" Width="300" 
+                                            DisplayMemberBinding="{Binding OriginalPath}"/>
+                            
+                            <GridViewColumn Header="الحجم" Width="100">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding OriginalSize, Converter={StaticResource FileSizeConverter}}"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            
+                            <GridViewColumn Header="تاريخ الحجر" Width="150">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding QuarantineTime, StringFormat='{}{0:yyyy/MM/dd HH:mm}'}"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            
+                            <GridViewColumn Header="الإجراءات" Width="180">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="استعادة" 
+                                                    Style="{StaticResource SuccessButtonStyle}"
+                                                    Padding="12,6"
+                                                    Margin="0,0,8,0"
+                                                    Command="{Binding DataContext.RestoreFileCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                    CommandParameter="{Binding}"/>
+                                            <Button Content="حذف" 
+                                                    Style="{StaticResource DangerButtonStyle}"
+                                                    Padding="12,6"
+                                                    Command="{Binding DataContext.DeleteQuarantinedFileCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                    CommandParameter="{Binding}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+                
+                <!-- رسالة عند عدم وجود ملفات -->
+                <StackPanel VerticalAlignment="Center" 
+                            HorizontalAlignment="Center"
+                            Visibility="{Binding QuarantineCount, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                    <TextBlock Text="🔒" FontSize="64" HorizontalAlignment="Center"/>
+                    <TextBlock Text="لا توجد ملفات في الحجر الصحي" 
+                               Style="{StaticResource SubHeaderStyle}"
+                               HorizontalAlignment="Center"
+                               Margin="0,16,0,0"/>
+                    <TextBlock Text="جميع الملفات المشبوهة سيتم نقلها هنا تلقائياً" 
+                               Style="{StaticResource BodyStyle}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,0 +1,215 @@
+<UserControl x:Class="ShieldAI.UI.Views.LogsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="800"
+             Background="Transparent">
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="سجل الأحداث" 
+                       FontSize="28" FontWeight="Bold" 
+                       Foreground="White"/>
+            <TextBlock Text="عرض سجل أحداث النظام والتهديدات المكتشفة" 
+                       FontSize="14" Foreground="#888" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- Filter Bar -->
+        <Border Grid.Row="1" Background="#1E1E2E" CornerRadius="10" Padding="15" Margin="0,0,0,15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Search Box -->
+                <Border Grid.Column="0" Background="#2A2A3E" CornerRadius="5" Margin="0,0,10,0">
+                    <TextBox x:Name="SearchBox" 
+                             Background="Transparent" 
+                             BorderThickness="0"
+                             Foreground="White"
+                             Padding="10,8"
+                             VerticalContentAlignment="Center">
+                        <TextBox.Style>
+                            <Style TargetType="TextBox">
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value="">
+                                        <Setter Property="Background">
+                                            <Setter.Value>
+                                                <VisualBrush AlignmentX="Left" AlignmentY="Center" Stretch="None">
+                                                    <VisualBrush.Visual>
+                                                        <TextBlock Text="🔍 بحث في السجلات..." Foreground="#666" Margin="10,0,0,0"/>
+                                                    </VisualBrush.Visual>
+                                                </VisualBrush>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
+                </Border>
+
+                <!-- Level Filter -->
+                <ComboBox Grid.Column="1" Width="120" Margin="0,0,10,0"
+                          Background="#2A2A3E" Foreground="White" 
+                          SelectedIndex="0">
+                    <ComboBoxItem Content="جميع المستويات"/>
+                    <ComboBoxItem Content="معلومات"/>
+                    <ComboBoxItem Content="تحذير"/>
+                    <ComboBoxItem Content="خطأ"/>
+                    <ComboBoxItem Content="حرج"/>
+                </ComboBox>
+
+                <!-- Date Filter -->
+                <ComboBox Grid.Column="2" Width="100" Margin="0,0,10,0"
+                          Background="#2A2A3E" Foreground="White"
+                          SelectedIndex="0">
+                    <ComboBoxItem Content="اليوم"/>
+                    <ComboBoxItem Content="أمس"/>
+                    <ComboBoxItem Content="آخر 7 أيام"/>
+                    <ComboBoxItem Content="آخر 30 يوم"/>
+                    <ComboBoxItem Content="الكل"/>
+                </ComboBox>
+
+                <!-- Refresh Button -->
+                <Button Grid.Column="3" Content="🔄 تحديث" 
+                        Background="#4F46E5" Foreground="White"
+                        Padding="15,8" Cursor="Hand"
+                        BorderThickness="0">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" 
+                                                CornerRadius="5" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Logs List -->
+        <Border Grid.Row="2" Background="#1E1E2E" CornerRadius="10" Padding="15">
+            <ListView x:Name="LogsList" 
+                      Background="Transparent" 
+                      BorderThickness="0"
+                      Foreground="White"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListViewItem">
+                                    <Border x:Name="Border" 
+                                            Background="#2A2A3E" 
+                                            CornerRadius="8" 
+                                            Padding="15" 
+                                            Margin="0,5">
+                                        <ContentPresenter/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Border" Property="Background" Value="#3A3A4E"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListView.ItemContainerStyle>
+
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Icon -->
+                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="20" 
+                                    Background="#3A3A4E" Margin="0,0,15,0"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Icon}" 
+                                           FontSize="18" 
+                                           HorizontalAlignment="Center" 
+                                           VerticalAlignment="Center"/>
+                            </Border>
+
+                            <!-- Content -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Message}" 
+                                           FontSize="14" FontWeight="SemiBold"
+                                           Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Details}" 
+                                           FontSize="12" Foreground="#888"
+                                           TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
+                            </StackPanel>
+
+                            <!-- Time -->
+                            <TextBlock Grid.Column="2" 
+                                       Text="{Binding TimeAgo}" 
+                                       FontSize="12" Foreground="#666"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+                
+                <!-- Sample Data -->
+                <ListView.Items>
+                    <StackPanel Tag="Info">
+                        <TextBlock x:Name="Icon" Text="ℹ️"/>
+                        <TextBlock x:Name="Message" Text="تم بدء الفحص السريع"/>
+                        <TextBlock x:Name="Details" Text="فحص مجلد المستخدم"/>
+                        <TextBlock x:Name="TimeAgo" Text="منذ 5 دقائق"/>
+                    </StackPanel>
+                </ListView.Items>
+            </ListView>
+        </Border>
+
+        <!-- Footer Stats -->
+        <Border Grid.Row="3" Background="#1E1E2E" CornerRadius="10" Padding="15" Margin="0,15,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="إجمالي السجلات: 1,234" 
+                           Foreground="#888" VerticalAlignment="Center"/>
+
+                <Button Grid.Column="1" Content="📥 تصدير" 
+                        Background="#2A2A3E" Foreground="White"
+                        Padding="15,8" Margin="0,0,10,0" Cursor="Hand"
+                        BorderThickness="0"/>
+
+                <Button Grid.Column="2" Content="🗑️ مسح السجلات القديمة" 
+                        Background="#DC2626" Foreground="White"
+                        Padding="15,8" Cursor="Hand"
+                        BorderThickness="0"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

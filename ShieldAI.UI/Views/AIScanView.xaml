@@ -1,0 +1,302 @@
+<UserControl x:Class="ShieldAI.UI.Views.AIScanView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d" 
+             d:DesignHeight="700" d:DesignWidth="900"
+             Background="Transparent">
+    
+    <UserControl.Resources>
+        <!-- Gradient Backgrounds -->
+        <LinearGradientBrush x:Key="PrimaryGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#667eea" Offset="0"/>
+            <GradientStop Color="#764ba2" Offset="1"/>
+        </LinearGradientBrush>
+        
+        <LinearGradientBrush x:Key="DangerGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#f93943" Offset="0"/>
+            <GradientStop Color="#ff6b6b" Offset="1"/>
+        </LinearGradientBrush>
+        
+        <LinearGradientBrush x:Key="SafeGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#11998e" Offset="0"/>
+            <GradientStop Color="#38ef7d" Offset="1"/>
+        </LinearGradientBrush>
+        
+        <LinearGradientBrush x:Key="WarningGradient" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#f7971e" Offset="0"/>
+            <GradientStop Color="#ffd200" Offset="1"/>
+        </LinearGradientBrush>
+        
+        <!-- Card Style -->
+        <Style x:Key="GlassCard" TargetType="Border">
+            <Setter Property="Background" Value="#1AFFFFFF"/>
+            <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.3"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <!-- Scan Button Style -->
+        <Style x:Key="ScanButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryGradient}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="40,20"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" 
+                                CornerRadius="12" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,30">
+            <TextBlock Text="🤖 AI Deep Scan" 
+                       FontSize="32" FontWeight="Bold" Foreground="White"/>
+            <TextBlock Text="تحليل عميق بالذكاء الاصطناعي" 
+                       FontSize="14" Foreground="#AAA" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                
+                <!-- File Selection / Drop Zone -->
+                <Border Style="{StaticResource GlassCard}" Padding="30" Margin="0,0,0,20"
+                        AllowDrop="True" x:Name="DropZone">
+                    <Grid>
+                        <StackPanel HorizontalAlignment="Center" 
+                                    Visibility="{Binding IsFileSelected, Converter={StaticResource InverseBoolToVisibility}}">
+                            <TextBlock Text="📁" FontSize="64" HorizontalAlignment="Center"/>
+                            <TextBlock Text="اسحب ملف هنا أو انقر لاختيار ملف" 
+                                       FontSize="18" Foreground="#AAA" 
+                                       HorizontalAlignment="Center" Margin="0,15,0,20"/>
+                            <Button Content="اختيار ملف" Style="{StaticResource ScanButton}"
+                                    Command="{Binding SelectFileCommand}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        
+                        <!-- Selected File Info -->
+                        <Grid Visibility="{Binding IsFileSelected, Converter={StaticResource BoolToVisibility}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <Border Grid.Column="0" Background="#2A2A3E" CornerRadius="12" 
+                                    Padding="20" Margin="0,0,20,0">
+                                <TextBlock Text="📄" FontSize="40"/>
+                            </Border>
+                            
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding SelectedFileName}" 
+                                           FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+                                <TextBlock Text="{Binding FileSizeFormatted}" 
+                                           FontSize="14" Foreground="#AAA" Margin="0,5,0,0"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Column="2" Content="✕" 
+                                    Command="{Binding ClearFileCommand}"
+                                    Background="Transparent" Foreground="#AAA"
+                                    FontSize="24" Cursor="Hand" Padding="10"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- Scan Button -->
+                <Button Content="🔍 بدء التحليل العميق" Style="{StaticResource ScanButton}"
+                        Command="{Binding StartAnalysisCommand}"
+                        HorizontalAlignment="Center" Margin="0,0,0,30"
+                        Visibility="{Binding IsScanning, Converter={StaticResource InverseBoolToVisibility}}"/>
+                
+                <!-- Progress Section -->
+                <Border Style="{StaticResource GlassCard}" Padding="25" Margin="0,0,0,20"
+                        Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding CurrentStage}" 
+                                       FontSize="16" Foreground="White"/>
+                            <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat={}{0}%}" 
+                                       FontSize="16" Foreground="#667eea" FontWeight="Bold"/>
+                        </Grid>
+                        <ProgressBar Value="{Binding ProgressPercent}" Maximum="100" 
+                                     Height="8" Background="#2A2A3E" Foreground="#667eea"
+                                     Margin="0,15,0,0"/>
+                        <Button Content="إلغاء" Command="{Binding CancelCommand}"
+                                Background="#f93943" Foreground="White"
+                                Padding="20,10" HorizontalAlignment="Center" Margin="0,20,0,0"
+                                Cursor="Hand"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Results Section -->
+                <Border Style="{StaticResource GlassCard}" Padding="25" Margin="0,0,0,20"
+                        Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <!-- Verdict Header -->
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <Border Grid.Column="0" CornerRadius="50" Width="80" Height="80"
+                                    Background="{Binding VerdictBackground}">
+                                <TextBlock Text="{Binding VerdictIcon}" FontSize="40" 
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,0,0">
+                                <TextBlock Text="{Binding VerdictText}" 
+                                           FontSize="24" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="{Binding ResultSummary}" 
+                                           FontSize="14" Foreground="#AAA" 
+                                           TextWrapping="Wrap" Margin="0,5,0,0"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Right">
+                                <TextBlock Text="درجة الخطورة" FontSize="12" Foreground="#AAA"/>
+                                <TextBlock Text="{Binding RiskScore, StringFormat={}{0:F0}%}" 
+                                           FontSize="36" FontWeight="Bold" Foreground="{Binding RiskScoreColor}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Analysis Details -->
+                        <Border Background="#15FFFFFF" CornerRadius="12" Padding="20" Margin="0,10,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                    <TextBlock Text="📋" FontSize="24" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="التوقيعات" FontSize="12" Foreground="#AAA" 
+                                               HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                                    <TextBlock Text="{Binding SignatureStatus}" FontSize="14" 
+                                               Foreground="{Binding SignatureStatusColor}" 
+                                               FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                                    <TextBlock Text="🔎" FontSize="24" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="السلوك" FontSize="12" Foreground="#AAA" 
+                                               HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                                    <TextBlock Text="{Binding HeuristicStatus}" FontSize="14" 
+                                               Foreground="{Binding HeuristicStatusColor}" 
+                                               FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                
+                                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                    <TextBlock Text="🤖" FontSize="24" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="AI" FontSize="12" Foreground="#AAA" 
+                                               HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                                    <TextBlock Text="{Binding MLStatus}" FontSize="14" 
+                                               Foreground="{Binding MLStatusColor}" 
+                                               FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                
+                                <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+                                    <TextBlock Text="🌐" FontSize="24" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="VirusTotal" FontSize="12" Foreground="#AAA" 
+                                               HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                                    <TextBlock Text="{Binding VTStatus}" FontSize="14" 
+                                               Foreground="{Binding VTStatusColor}" 
+                                               FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Findings List -->
+                        <TextBlock Text="الاكتشافات" FontSize="16" FontWeight="SemiBold" 
+                                   Foreground="White" Margin="0,25,0,10"
+                                   Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}"/>
+                        
+                        <ItemsControl ItemsSource="{Binding Findings}" Margin="0,0,0,15">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#10FFFFFF" CornerRadius="8" 
+                                            Padding="15" Margin="0,0,0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <Border Grid.Column="0" Background="{Binding SeverityColor}" 
+                                                    CornerRadius="4" Padding="8,4" Margin="0,0,15,0"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding SeverityText}" 
+                                                           FontSize="11" Foreground="White"/>
+                                            </Border>
+                                            
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="{Binding Title}" 
+                                                           FontSize="14" Foreground="White"/>
+                                                <TextBlock Text="{Binding Description}" 
+                                                           FontSize="12" Foreground="#888" 
+                                                           TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            
+                                            <TextBlock Grid.Column="2" 
+                                                       Text="{Binding Confidence, StringFormat={}{0}%}" 
+                                                       FontSize="14" Foreground="#667eea"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Actions -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
+                            <Button Content="🛡️ عزل الملف" Command="{Binding QuarantineCommand}"
+                                    Background="#f93943" Foreground="White"
+                                    Padding="25,12" Margin="0,0,10,0" Cursor="Hand"
+                                    Visibility="{Binding IsThreat, Converter={StaticResource BoolToVisibility}}"/>
+                            <Button Content="📄 تصدير التقرير" Command="{Binding ExportReportCommand}"
+                                    Background="#2A2A3E" Foreground="White"
+                                    Padding="25,12" Cursor="Hand"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

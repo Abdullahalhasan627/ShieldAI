@@ -1,0 +1,149 @@
+<UserControl x:Class="ShieldAI.UI.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="800">
+    
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+            <!-- العنوان -->
+            <TextBlock Text="لوحة القيادة" Style="{StaticResource HeaderStyle}" Margin="0,0,0,24"/>
+            
+            <!-- بطاقات الإحصائيات -->
+            <UniformGrid Columns="4" Margin="0,0,0,24">
+                <!-- حالة الحماية -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Text="🛡️" FontSize="32"/>
+                        <TextBlock Text="{Binding ProtectionStatus}" 
+                                   Style="{StaticResource SubHeaderStyle}"
+                                   Foreground="{Binding ProtectionStatusColor}"
+                                   Margin="0,8,0,0"/>
+                        <TextBlock Text="حالة الحماية" 
+                                   Style="{StaticResource BodyStyle}"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- الملفات المفحوصة -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Text="📄" FontSize="32"/>
+                        <TextBlock Text="{Binding TotalFilesScanned}" 
+                                   Style="{StaticResource SubHeaderStyle}"
+                                   Margin="0,8,0,0"/>
+                        <TextBlock Text="ملف تم فحصه" 
+                                   Style="{StaticResource BodyStyle}"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- التهديدات المكتشفة -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,12,0">
+                    <StackPanel>
+                        <TextBlock Text="⚠️" FontSize="32"/>
+                        <TextBlock Text="{Binding TotalThreatsDetected}" 
+                                   Style="{StaticResource SubHeaderStyle}"
+                                   Foreground="{StaticResource DangerBrush}"
+                                   Margin="0,8,0,0"/>
+                        <TextBlock Text="تهديد مكتشف" 
+                                   Style="{StaticResource BodyStyle}"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- الحجر الصحي -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Text="🔒" FontSize="32"/>
+                        <TextBlock Text="{Binding QuarantineCount}" 
+                                   Style="{StaticResource SubHeaderStyle}"
+                                   Foreground="{StaticResource WarningBrush}"
+                                   Margin="0,8,0,0"/>
+                        <TextBlock Text="ملف في الحجر" 
+                                   Style="{StaticResource BodyStyle}"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+            
+            <!-- أزرار الفحص السريع -->
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <TextBlock Text="الفحص السريع" Style="{StaticResource SubHeaderStyle}" Margin="0,0,0,16"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="🔍 فحص سريع" 
+                                Style="{StaticResource ModernButtonStyle}"
+                                Command="{Binding QuickScanCommand}"
+                                IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                                Margin="0,0,12,0"/>
+                        <Button Content="🖥️ فحص كامل" 
+                                Style="{StaticResource ModernButtonStyle}"
+                                Command="{Binding FullScanCommand}"
+                                IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                                Margin="0,0,12,0"/>
+                        <Button Content="⚙️ فحص العمليات" 
+                                Style="{StaticResource ModernButtonStyle}"
+                                Command="{Binding ScanProcessesCommand}"
+                                IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            
+            <!-- آخر التهديدات -->
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <TextBlock Text="آخر التهديدات المكتشفة" Style="{StaticResource SubHeaderStyle}" Margin="0,0,0,16"/>
+                    <ItemsControl ItemsSource="{Binding RecentThreats}" MaxHeight="200">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource BackgroundHoverBrush}" 
+                                        CornerRadius="8" 
+                                        Padding="12"
+                                        Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <Ellipse Grid.Column="0" Width="40" Height="40" 
+                                                 Fill="{StaticResource DangerBrush}"
+                                                 Margin="0,0,12,0"/>
+                                        <TextBlock Grid.Column="0" Text="⚠️" 
+                                                   FontSize="20" 
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,12,0"/>
+                                        
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding ScanResult.Threat.Name}" 
+                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                                       FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding FilePath}" 
+                                                       Style="{StaticResource BodyStyle}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        
+                                        <TextBlock Grid.Column="2" 
+                                                   Text="{Binding DetectionTime, StringFormat='{}{0:HH:mm}'}" 
+                                                   Style="{StaticResource BodyStyle}"
+                                                   VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    
+                    <TextBlock Text="لا توجد تهديدات مكتشفة"
+                               Style="{StaticResource BodyStyle}"
+                               HorizontalAlignment="Center"
+                               Visibility="{Binding RecentThreats.Count, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

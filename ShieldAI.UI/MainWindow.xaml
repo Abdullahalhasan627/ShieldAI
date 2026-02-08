@@ -1,0 +1,206 @@
+﻿<Window x:Class="ShieldAI.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="clr-namespace:ShieldAI.UI.Views"
+        xmlns:vm="clr-namespace:ShieldAI.UI.ViewModels"
+        mc:Ignorable="d"
+        Title="ShieldAI - مكافح الفيروسات الذكي" 
+        Height="750" Width="1200"
+        MinHeight="600" MinWidth="900"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        WindowStartupLocation="CenterScreen">
+    
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Styles/ModernStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    
+    <Border Background="{StaticResource BackgroundDarkBrush}" 
+            CornerRadius="12"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="50"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- شريط العنوان المخصص -->
+            <Border Grid.Row="0" 
+                    Background="{StaticResource BackgroundCardBrush}"
+                    CornerRadius="12,12,0,0"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <!-- الشعار والعنوان -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="16,0">
+                        <Ellipse Width="30" Height="30" Fill="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="🛡️" FontSize="18" VerticalAlignment="Center" Margin="-22,0,0,0"/>
+                        <TextBlock Text="ShieldAI" 
+                                   Style="{StaticResource SubHeaderStyle}"
+                                   VerticalAlignment="Center"
+                                   Margin="16,0,0,0"/>
+                    </StackPanel>
+                    
+                    <!-- حالة الحماية -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Ellipse Width="10" Height="10" 
+                                 Fill="{Binding ProtectionStatusColor}"
+                                 VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding ProtectionStatus}" 
+                                   Style="{StaticResource BodyStyle}"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0"/>
+                    </StackPanel>
+                    
+                    <!-- أزرار التحكم بالنافذة -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,8,0">
+                        <Button Content="─" 
+                                Width="40" Height="35"
+                                Background="Transparent"
+                                Foreground="{StaticResource TextSecondaryBrush}"
+                                BorderThickness="0"
+                                FontSize="16"
+                                Click="MinimizeButton_Click"
+                                Cursor="Hand"/>
+                        <Button Content="□" 
+                                Width="40" Height="35"
+                                Background="Transparent"
+                                Foreground="{StaticResource TextSecondaryBrush}"
+                                BorderThickness="0"
+                                FontSize="14"
+                                Click="MaximizeButton_Click"
+                                Cursor="Hand"/>
+                        <Button Content="✕" 
+                                Width="40" Height="35"
+                                Background="Transparent"
+                                Foreground="{StaticResource TextSecondaryBrush}"
+                                BorderThickness="0"
+                                FontSize="14"
+                                Click="CloseButton_Click"
+                                Cursor="Hand"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+            
+            <!-- المحتوى الرئيسي -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="220"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- القائمة الجانبية -->
+                <Border Grid.Column="0" 
+                        Background="{StaticResource BackgroundCardBrush}"
+                        Margin="0,0,1,0">
+                    <StackPanel Margin="0,20,0,0">
+                        <RadioButton x:Name="DashboardRadio"
+                                     Style="{StaticResource SidebarButtonStyle}"
+                                     IsChecked="True"
+                                     GroupName="Navigation">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🏠" FontSize="16" Margin="0,0,12,0"/>
+                                <TextBlock Text="لوحة القيادة" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+                        
+                        <RadioButton x:Name="ScanRadio"
+                                     Style="{StaticResource SidebarButtonStyle}"
+                                     GroupName="Navigation">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔍" FontSize="16" Margin="0,0,12,0"/>
+                                <TextBlock Text="فحص الملفات" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+                        
+                        <RadioButton x:Name="ProcessesRadio"
+                                     Style="{StaticResource SidebarButtonStyle}"
+                                     GroupName="Navigation">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⚙️" FontSize="16" Margin="0,0,12,0"/>
+                                <TextBlock Text="العمليات" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+                        
+                        <RadioButton x:Name="QuarantineRadio"
+                                     Style="{StaticResource SidebarButtonStyle}"
+                                     GroupName="Navigation">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔒" FontSize="16" Margin="0,0,12,0"/>
+                                <TextBlock Text="الحجر الصحي" VerticalAlignment="Center"/>
+                                <Border Background="{StaticResource DangerBrush}" 
+                                        CornerRadius="10"
+                                        Padding="6,2"
+                                        Margin="8,0,0,0"
+                                        Visibility="{Binding QuarantineCountVisibility}">
+                                    <TextBlock Text="{Binding QuarantineCount}" 
+                                               Foreground="White"
+                                               FontSize="11"/>
+                                </Border>
+                            </StackPanel>
+                        </RadioButton>
+                        
+                        <RadioButton x:Name="SettingsRadio"
+                                     Style="{StaticResource SidebarButtonStyle}"
+                                     GroupName="Navigation">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⚡" FontSize="16" Margin="0,0,12,0"/>
+                                <TextBlock Text="الإعدادات" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+                        
+                        <!-- معلومات المراقبة -->
+                        <Border Style="{StaticResource CardStyle}" 
+                                Margin="12,30,12,0"
+                                Padding="12">
+                            <StackPanel>
+                                <TextBlock Text="المراقبة الفورية" 
+                                           Style="{StaticResource BodyStyle}"
+                                           FontWeight="SemiBold"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <ToggleButton Style="{StaticResource ToggleSwitchStyle}"
+                                                  IsChecked="{Binding IsMonitoringEnabled, Mode=TwoWay}"/>
+                                    <TextBlock Text="{Binding MonitoringStatusText}" 
+                                               Style="{StaticResource BodyStyle}"
+                                               VerticalAlignment="Center"
+                                               Margin="12,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+                
+                <!-- منطقة المحتوى -->
+                <Grid Grid.Column="1" Margin="24">
+                    <!-- لوحة القيادة -->
+                    <views:DashboardView Visibility="{Binding ElementName=DashboardRadio, Path=IsChecked, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    
+                    <!-- صفحة الفحص -->
+                    <views:ScanView Visibility="{Binding ElementName=ScanRadio, Path=IsChecked, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    
+                    <!-- صفحة العمليات -->
+                    <views:ProcessesView Visibility="{Binding ElementName=ProcessesRadio, Path=IsChecked, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    
+                    <!-- صفحة الحجر الصحي -->
+                    <views:QuarantineView Visibility="{Binding ElementName=QuarantineRadio, Path=IsChecked, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    
+                    <!-- صفحة الإعدادات -->
+                    <views:SettingsView Visibility="{Binding ElementName=SettingsRadio, Path=IsChecked, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
