@@ -123,3 +123,28 @@ public class StringToVisibilityConverter : IValueConverter
         throw new NotImplementedException();
     }
 }
+
+/// <summary>
+/// تحويل Index إلى Boolean للتنقل بين الصفحات
+/// </summary>
+public class IndexToBoolConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is int index && parameter is string param && int.TryParse(param, out int targetIndex))
+        {
+            return index == targetIndex;
+        }
+        return false;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool isChecked && isChecked && parameter is string param && int.TryParse(param, out int targetIndex))
+        {
+            return targetIndex;
+        }
+        return Binding.DoNothing;
+    }
+}
+

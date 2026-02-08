@@ -4,9 +4,13 @@ using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ShieldAI.Core.Configuration;
+using ShieldAI.Core.Detection;
 using ShieldAI.Core.Models;
 using ShieldAI.Core.Monitoring;
 using ShieldAI.Core.Scanning;
+using QuarantineManager = ShieldAI.Core.Monitoring.QuarantineManager;
+using QuarantineEntry = ShieldAI.Core.Monitoring.QuarantineEntry;
 
 namespace ShieldAI.UI.ViewModels;
 
@@ -21,6 +25,7 @@ public partial class MainViewModel : ObservableObject
     private readonly QuarantineManager _quarantineManager;
     private readonly SignatureDatabase _signatureDb;
     private CancellationTokenSource? _scanCts;
+    private readonly HashSet<string> _scannedHashes = new();
 
     public MainViewModel()
     {
@@ -39,6 +44,22 @@ public partial class MainViewModel : ObservableObject
         // تحميل البيانات الأولية
         LoadQuarantinedFiles();
         UpdateStatistics();
+        LoadSettings();
+    }
+
+    private void LoadSettings()
+    {
+        var settings = ConfigManager.Instance.Settings;
+        IsMonitoringEnabled = settings.EnableRealTimeProtection;
+        VirusTotalApiKey = settings.VirusTotalApiKey ?? string.Empty;
+    }
+
+    private void SaveSettings()
+    {
+        var settings = ConfigManager.Instance.Settings;
+        settings.EnableRealTimeProtection = IsMonitoringEnabled;
+        settings.VirusTotalApiKey = VirusTotalApiKey;
+        ConfigManager.Instance.Save();
     }
 
     // ==================== الخصائص ====================
@@ -51,6 +72,21 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isMonitoringEnabled;
+
+    [ObservableProperty]
+    private int _selectedViewIndex;
+
+    [ObservableProperty]
+    private string _virusTotalApiKey = string.Empty;
+
+    [ObservableProperty]
+    private string _apiKeyStatus = string.Empty;
+
+    [ObservableProperty]
+    private string _apiKeyStatusIcon = string.Empty;
+
+    [ObservableProperty]
+    private SolidColorBrush _apiKeyStatusColor = new(Colors.Gray);
 
     [ObservableProperty]
     private string _monitoringStatusText = "متوقف";
@@ -105,6 +141,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task QuickScanAsync()
     {
+        SelectedViewIndex = 1; // Navigate to ScanView
         var paths = new[]
         {
             Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
@@ -118,6 +155,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task FullScanAsync()
     {
+        SelectedViewIndex = 1; // Navigate to ScanView
         var drives = DriveInfo.GetDrives()
             .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
             .Select(d => d.RootDirectory.FullName)
@@ -130,6 +168,7 @@ public partial class MainViewModel : ObservableObject
     private async Task CustomScanAsync()
     {
         if (string.IsNullOrEmpty(SelectedPath)) return;
+        SelectedViewIndex = 1; // Navigate to ScanView
         await ScanPathsAsync(new[] { SelectedPath }, "الفحص المخصص");
     }
 
@@ -148,6 +187,7 @@ public partial class MainViewModel : ObservableObject
         IsScanning = true;
         _scanCts = new CancellationTokenSource();
         ScanResults.Clear();
+        _scannedHashes.Clear(); // Reset hash tracking for new scan
         ScannedFilesCount = 0;
         ThreatsFoundCount = 0;
         ScanProgress = 0;
@@ -164,21 +204,13 @@ public partial class MainViewModel : ObservableObject
                     var results = await _fileScanner.ScanDirectoryAsync(path, true, _scanCts.Token);
                     foreach (var result in results)
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            ScanResults.Add(result);
-                            if (result.IsInfected) ThreatsFoundCount++;
-                        });
+                        await ProcessScanResultAsync(result);
                     }
                 }
                 else if (File.Exists(path))
                 {
                     var result = await _fileScanner.ScanFileAsync(path, _scanCts.Token);
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        ScanResults.Add(result);
-                        if (result.IsInfected) ThreatsFoundCount++;
-                    });
+                    await ProcessScanResultAsync(result);
                 }
             }
 
@@ -200,6 +232,101 @@ public partial class MainViewModel : ObservableObject
             ScanProgress = 100;
             _scanCts?.Dispose();
             _scanCts = null;
+        }
+    }
+
+    /// <summary>
+    /// معالجة نتيجة الفحص مع منع التكرار والحجر التلقائي
+    /// </summary>
+    private async Task ProcessScanResultAsync(LegacyScanResult result)
+    {
+        // Calculate file hash for duplicate detection
+        string fileHash = result.Threat?.FileHash ?? result.FilePath;
+        
+        // Skip if already processed
+        if (_scannedHashes.Contains(fileHash))
+        {
+            return;
+        }
+        _scannedHashes.Add(fileHash);
+
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            ScanResults.Add(result);
+        });
+
+        if (result.IsInfected)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                ThreatsFoundCount++;
+            });
+
+            // Auto-quarantine infected files
+            try
+            {
+                await _quarantineManager.QuarantineFileAsync(result.FilePath);
+                
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    LoadQuarantinedFiles();
+                });
+            }
+            catch (Exception)
+            {
+                // Log error but don't stop scan
+            }
+        }
+    }
+
+    [RelayCommand]
+    private async Task TestApiKeyAsync()
+    {
+        if (string.IsNullOrEmpty(VirusTotalApiKey))
+        {
+            ApiKeyStatus = "يرجى إدخال مفتاح API";
+            ApiKeyStatusIcon = "❌";
+            ApiKeyStatusColor = new SolidColorBrush(Colors.Red);
+            return;
+        }
+
+        ApiKeyStatus = "جاري الاختبار...";
+        ApiKeyStatusIcon = "⏳";
+        ApiKeyStatusColor = new SolidColorBrush(Colors.Gray);
+
+        try
+        {
+            using var httpClient = new System.Net.Http.HttpClient();
+            httpClient.DefaultRequestHeaders.Add("x-apikey", VirusTotalApiKey);
+            httpClient.Timeout = TimeSpan.FromSeconds(10);
+
+            var response = await httpClient.GetAsync("https://www.virustotal.com/api/v3/users/me");
+
+            if (response.IsSuccessStatusCode)
+            {
+                ApiKeyStatus = "تم الاتصال بنجاح ✓";
+                ApiKeyStatusIcon = "✅";
+                ApiKeyStatusColor = new SolidColorBrush(Colors.LimeGreen);
+                SaveSettings();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                ApiKeyStatus = "مفتاح API غير صالح";
+                ApiKeyStatusIcon = "❌";
+                ApiKeyStatusColor = new SolidColorBrush(Colors.Red);
+            }
+            else
+            {
+                ApiKeyStatus = $"خطأ: {response.StatusCode}";
+                ApiKeyStatusIcon = "⚠️";
+                ApiKeyStatusColor = new SolidColorBrush(Colors.Orange);
+            }
+        }
+        catch (Exception ex)
+        {
+            ApiKeyStatus = $"فشل الاتصال: {ex.Message}";
+            ApiKeyStatusIcon = "❌";
+            ApiKeyStatusColor = new SolidColorBrush(Colors.Red);
         }
     }
 
@@ -318,6 +445,7 @@ public partial class MainViewModel : ObservableObject
             ProtectionStatus = "غير محمي";
             ProtectionStatusColor = new SolidColorBrush(Colors.Orange);
         }
+        SaveSettings(); // Persist settings
     }
 
     public void StopMonitoring()

@@ -109,7 +109,7 @@
                     <StackPanel Margin="0,20,0,0">
                         <RadioButton x:Name="DashboardRadio"
                                      Style="{StaticResource SidebarButtonStyle}"
-                                     IsChecked="True"
+                                     IsChecked="{Binding SelectedViewIndex, Converter={StaticResource IndexToBoolConverter}, ConverterParameter=0, Mode=TwoWay}"
                                      GroupName="Navigation">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🏠" FontSize="16" Margin="0,0,12,0"/>
@@ -119,6 +119,7 @@
                         
                         <RadioButton x:Name="ScanRadio"
                                      Style="{StaticResource SidebarButtonStyle}"
+                                     IsChecked="{Binding SelectedViewIndex, Converter={StaticResource IndexToBoolConverter}, ConverterParameter=1, Mode=TwoWay}"
                                      GroupName="Navigation">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🔍" FontSize="16" Margin="0,0,12,0"/>
@@ -128,6 +129,7 @@
                         
                         <RadioButton x:Name="ProcessesRadio"
                                      Style="{StaticResource SidebarButtonStyle}"
+                                     IsChecked="{Binding SelectedViewIndex, Converter={StaticResource IndexToBoolConverter}, ConverterParameter=2, Mode=TwoWay}"
                                      GroupName="Navigation">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="⚙️" FontSize="16" Margin="0,0,12,0"/>
@@ -137,6 +139,7 @@
                         
                         <RadioButton x:Name="QuarantineRadio"
                                      Style="{StaticResource SidebarButtonStyle}"
+                                     IsChecked="{Binding SelectedViewIndex, Converter={StaticResource IndexToBoolConverter}, ConverterParameter=3, Mode=TwoWay}"
                                      GroupName="Navigation">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🔒" FontSize="16" Margin="0,0,12,0"/>
@@ -155,6 +158,7 @@
                         
                         <RadioButton x:Name="SettingsRadio"
                                      Style="{StaticResource SidebarButtonStyle}"
+                                     IsChecked="{Binding SelectedViewIndex, Converter={StaticResource IndexToBoolConverter}, ConverterParameter=4, Mode=TwoWay}"
                                      GroupName="Navigation">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="⚡" FontSize="16" Margin="0,0,12,0"/>

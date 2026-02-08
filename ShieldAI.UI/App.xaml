@@ -17,6 +17,7 @@
             <converters:FileSizeConverter x:Key="FileSizeConverter"/>
             <converters:RiskToColorConverter x:Key="RiskToColorConverter"/>
             <converters:StringToVisibilityConverter x:Key="StringToVisibility"/>
+            <converters:IndexToBoolConverter x:Key="IndexToBoolConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
