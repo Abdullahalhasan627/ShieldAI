@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ShieldAI.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c357d8416b8e7c2eeb2b053c59d7337e42d70702")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
 [assembly: System.Reflection.AssemblyProductAttribute("ShieldAI.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ShieldAI.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
