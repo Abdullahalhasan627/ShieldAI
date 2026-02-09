@@ -19,7 +19,10 @@ public class FileScanner
     private static readonly HashSet<string> ScannableExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".exe", ".dll", ".sys", ".scr", ".com", ".bat", ".cmd", ".ps1",
-        ".vbs", ".js", ".jse", ".wsf", ".wsh", ".msi", ".msp"
+        ".vbs", ".js", ".jse", ".wsf", ".wsh", ".msi", ".msp",
+        // إضافة امتدادات أخرى شائعة
+        ".doc", ".docx", ".xls", ".xlsx", ".pdf", ".zip", ".rar", ".7z",
+        ".lnk", ".pif", ".jar", ".py", ".rb", ".php", ".asp", ".aspx"
     };
 
     /// <summary>
@@ -232,8 +235,8 @@ public class FileScanner
         if (!Directory.Exists(directoryPath))
             return results;
 
-        var searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-        var files = Directory.GetFiles(directoryPath, "*.*", searchOption)
+        // استخدام enumeration آمن يتعامل مع مجلدات محمية
+        var files = SafeEnumerateFiles(directoryPath, recursive)
             .Where(f => ScannableExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
             .ToList();
 
@@ -248,11 +251,57 @@ public class FileScanner
             current++;
             ScanProgress?.Invoke(this, new FileScanProgressEventArgs(current, total, file));
 
-            var result = await ScanFileAsync(file, cancellationToken);
-            results.Add(result);
+            try
+            {
+                var result = await ScanFileAsync(file, cancellationToken);
+                results.Add(result);
+                FileScanCompleted?.Invoke(this, result);
+            }
+            catch (Exception)
+            {
+                // تخطي الملفات التي لا يمكن الوصول إليها
+            }
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// تعداد آمن للملفات يتعامل مع الأخطاء
+    /// </summary>
+    private static IEnumerable<string> SafeEnumerateFiles(string path, bool recursive)
+    {
+        var files = new List<string>();
+        
+        try
+        {
+            // الحصول على الملفات في المجلد الحالي
+            files.AddRange(Directory.GetFiles(path));
+        }
+        catch (UnauthorizedAccessException) { }
+        catch (PathTooLongException) { }
+        catch (IOException) { }
+
+        if (recursive)
+        {
+            try
+            {
+                foreach (var dir in Directory.GetDirectories(path))
+                {
+                    // تخطي مجلدات النظام المحمية
+                    var dirName = Path.GetFileName(dir).ToLowerInvariant();
+                    if (dirName is "$recycle.bin" or "system volume information" or "windows" or "program files" or "program files (x86)")
+                        continue;
+
+                    files.AddRange(SafeEnumerateFiles(dir, true));
+                }
+            }
+            catch (UnauthorizedAccessException) { }
+            catch (PathTooLongException) { }
+            catch (IOException) { }
+        }
+
+        return files;
     }
 
     /// <summary>

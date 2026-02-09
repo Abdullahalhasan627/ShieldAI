@@ -37,6 +37,12 @@
                         <TextBlock Text="ملف تم فحصه" 
                                    Style="{StaticResource BodyStyle}"
                                    Margin="0,4,0,0"/>
+                        <Button Content="🔍 عرض الملفات"
+                                Style="{StaticResource ModernButtonStyle}"
+                                Command="{Binding ViewScannedFilesCommand}"
+                                Margin="0,12,0,0"
+                                FontSize="12"
+                                Padding="8,4"/>
                     </StackPanel>
                 </Border>
                 
@@ -51,6 +57,12 @@
                         <TextBlock Text="تهديد مكتشف" 
                                    Style="{StaticResource BodyStyle}"
                                    Margin="0,4,0,0"/>
+                        <Button Content="🔍 عرض الملفات"
+                                Style="{StaticResource DangerButtonStyle}"
+                                Command="{Binding ViewThreatsCommand}"
+                                Margin="0,12,0,0"
+                                FontSize="12"
+                                Padding="8,4"/>
                     </StackPanel>
                 </Border>
                 

@@ -1,279 +1,329 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using ShieldAI.Core.Models;
-using ShieldAI.Core.Detection;
 
 namespace ShieldAI.Core.Scanning;
 
 /// <summary>
-/// فاحص العمليات الجارية
-/// يراقب العمليات النشطة ويتحقق من سلامتها
+/// فاحص العمليات الجارية - نسخة محسنة
+/// يعتمد على المسار والتوقيع الرقمي والـ Hash بدلاً من الاسم فقط
 /// </summary>
 public class ProcessScanner
 {
-    private readonly FileScanner _fileScanner;
-    private readonly SignatureDatabase _signatureDb;
-
-    // قائمة العمليات الموثوقة من Microsoft
-    private static readonly HashSet<string> TrustedProcesses = new(StringComparer.OrdinalIgnoreCase)
+    // المسارات الموثوقة
+    private static readonly string[] TrustedPaths = 
     {
-        "explorer.exe", "svchost.exe", "csrss.exe", "wininit.exe",
-        "services.exe", "lsass.exe", "smss.exe", "dwm.exe",
-        "taskmgr.exe", "notepad.exe", "mmc.exe", "devenv.exe",
-        "code.exe", "chrome.exe", "firefox.exe", "msedge.exe"
+        Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
     };
 
-    /// <summary>
-    /// حدث عند اكتشاف عملية مشبوهة
-    /// </summary>
+    // المسارات المشبوهة
+    private static readonly string[] SuspiciousPaths =
+    {
+        Path.GetTempPath(),
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+    };
+
+    // العمليات الحرجة التي لا يمكن إنهاؤها
+    private static readonly HashSet<string> CriticalProcesses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "csrss", "wininit", "services", "lsass", "smss", 
+        "winlogon", "System", "dwm", "svchost"
+    };
+
+    // الناشرون الموثوقون
+    private static readonly HashSet<string> TrustedPublishers = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Microsoft Corporation",
+        "Microsoft Windows",
+        "Google LLC",
+        "Mozilla Corporation",
+        "Apple Inc."
+    };
+
     public event EventHandler<ProcessInfo>? SuspiciousProcessDetected;
 
-    public ProcessScanner(FileScanner? fileScanner = null, SignatureDatabase? signatureDb = null)
-    {
-        _signatureDb = signatureDb ?? new SignatureDatabase();
-        _fileScanner = fileScanner ?? new FileScanner(_signatureDb);
-    }
-
     /// <summary>
-    /// الحصول على قائمة جميع العمليات
+    /// الحصول على قائمة جميع العمليات مع تحليل الموثوقية
     /// </summary>
-    public async Task<List<ProcessInfo>> GetAllProcessesAsync(CancellationToken cancellationToken = default)
+    public List<ProcessInfo> GetAllProcesses()
     {
-        var processes = new List<ProcessInfo>();
-        
-        var systemProcesses = Process.GetProcesses();
+        var result = new List<ProcessInfo>();
 
-        foreach (var process in systemProcesses)
+        foreach (var proc in Process.GetProcesses())
         {
-            if (cancellationToken.IsCancellationRequested)
-                break;
-
             try
             {
-                var info = await GetProcessInfoAsync(process, cancellationToken);
-                if (info != null)
+                var info = new ProcessInfo
                 {
-                    processes.Add(info);
-                }
+                    ProcessId = proc.Id,
+                    ProcessName = proc.ProcessName
+                };
+
+                // الذاكرة
+                try { info.MemoryUsage = proc.WorkingSet64; } catch { }
+
+                // المسار
+                try { info.ExecutablePath = proc.MainModule?.FileName; } catch { }
+
+                // تحليل الموثوقية بناءً على معايير متعددة
+                AnalyzeTrust(info);
+
+                result.Add(info);
             }
-            catch
-            {
-                // تجاهل العمليات التي لا يمكن الوصول إليها
-            }
+            catch { }
             finally
             {
-                process.Dispose();
+                proc.Dispose();
             }
         }
 
-        return processes;
+        return result;
     }
 
     /// <summary>
-    /// الحصول على معلومات عملية واحدة
+    /// تحليل موثوقية العملية
     /// </summary>
-    public async Task<ProcessInfo?> GetProcessInfoAsync(Process process, CancellationToken cancellationToken = default)
+    private void AnalyzeTrust(ProcessInfo info)
+    {
+        int trustScore = 0;
+        int suspicionScore = 0;
+
+        if (string.IsNullOrEmpty(info.ExecutablePath))
+        {
+            // لا يوجد مسار - مشبوه قليلاً
+            suspicionScore += 1;
+            info.IsTrusted = false;
+            return;
+        }
+
+        // 1. فحص المسار
+        var pathLower = info.ExecutablePath.ToLowerInvariant();
+
+        // مسارات موثوقة
+        foreach (var trustedPath in TrustedPaths)
+        {
+            if (!string.IsNullOrEmpty(trustedPath) && 
+                pathLower.StartsWith(trustedPath.ToLowerInvariant()))
+            {
+                trustScore += 2;
+                break;
+            }
+        }
+
+        // مسارات مشبوهة
+        foreach (var suspiciousPath in SuspiciousPaths)
+        {
+            if (!string.IsNullOrEmpty(suspiciousPath) && 
+                pathLower.StartsWith(suspiciousPath.ToLowerInvariant()))
+            {
+                suspicionScore += 2;
+                break;
+            }
+        }
+
+        // 2. فحص التوقيع الرقمي
+        var signatureInfo = GetDigitalSignature(info.ExecutablePath);
+        if (signatureInfo.IsSigned)
+        {
+            trustScore += 2;
+            
+            if (TrustedPublishers.Contains(signatureInfo.Publisher ?? ""))
+            {
+                trustScore += 3; // ناشر موثوق = ثقة عالية
+            }
+        }
+        else
+        {
+            suspicionScore += 1; // غير موقع = مشبوه قليلاً
+        }
+
+        // 3. حساب الـ Hash للسمعة (يمكن ربطه بقاعدة بيانات لاحقاً)
+        try
+        {
+            info.FileHash = CalculateSha256(info.ExecutablePath);
+        }
+        catch { }
+
+        // تحديد الحالة النهائية
+        info.IsTrusted = trustScore >= 4;
+        info.IsSuspicious = suspicionScore >= 2 && trustScore < 3;
+
+        if (info.IsSuspicious)
+        {
+            SuspiciousProcessDetected?.Invoke(this, info);
+        }
+    }
+
+    /// <summary>
+    /// الحصول على معلومات التوقيع الرقمي
+    /// </summary>
+    private (bool IsSigned, string? Publisher) GetDigitalSignature(string filePath)
     {
         try
         {
-            var info = new ProcessInfo
+            var cert = X509Certificate.CreateFromSignedFile(filePath);
+            var cert2 = new X509Certificate2(cert);
+            
+            // استخراج اسم الناشر من Subject
+            var subject = cert2.Subject;
+            var cnStart = subject.IndexOf("CN=", StringComparison.OrdinalIgnoreCase);
+            if (cnStart >= 0)
             {
-                ProcessId = process.Id,
-                ProcessName = process.ProcessName,
-                MemoryUsage = process.WorkingSet64
-            };
-
-            // محاولة الحصول على مسار الملف
-            try
-            {
-                info.ExecutablePath = process.MainModule?.FileName;
+                cnStart += 3;
+                var cnEnd = subject.IndexOf(',', cnStart);
+                var publisher = cnEnd > cnStart 
+                    ? subject.Substring(cnStart, cnEnd - cnStart).Trim('"')
+                    : subject.Substring(cnStart).Trim('"');
+                
+                return (true, publisher);
             }
-            catch (System.ComponentModel.Win32Exception)
-            {
-                // لا يمكن الوصول لمسار العملية (يتطلب صلاحيات أعلى)
-            }
-
-            // التحقق من كونها عملية موثوقة
-            info.IsTrusted = IsTrustedProcess(info.ProcessName);
-
-            // حساب البصمة إن أمكن
-            if (!string.IsNullOrEmpty(info.ExecutablePath) && File.Exists(info.ExecutablePath))
-            {
-                info.FileHash = await Task.Run(() => 
-                    PEAnalyzer.CalculateSha256(info.ExecutablePath), cancellationToken);
-            }
-
-            return info;
+            
+            return (true, cert2.Subject);
         }
         catch
         {
-            return null;
+            return (false, null);
         }
+    }
+
+    /// <summary>
+    /// حساب SHA256 للملف
+    /// </summary>
+    private string CalculateSha256(string filePath)
+    {
+        using var sha256 = SHA256.Create();
+        using var stream = File.OpenRead(filePath);
+        var hashBytes = sha256.ComputeHash(stream);
+        return Convert.ToHexString(hashBytes);
+    }
+
+    /// <summary>
+    /// الحصول على العمليات بشكل غير متزامن
+    /// </summary>
+    public Task<List<ProcessInfo>> GetAllProcessesAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.Run(() => GetAllProcesses(), cancellationToken);
     }
 
     /// <summary>
     /// فحص جميع العمليات
     /// </summary>
-    public async Task<List<ProcessInfo>> ScanAllProcessesAsync(CancellationToken cancellationToken = default)
+    public Task<List<ProcessInfo>> ScanAllProcessesAsync(CancellationToken cancellationToken = default)
     {
-        var processes = await GetAllProcessesAsync(cancellationToken);
-        var results = new List<ProcessInfo>();
-
-        foreach (var process in processes)
-        {
-            if (cancellationToken.IsCancellationRequested)
-                break;
-
-            // تخطي العمليات بدون مسار
-            if (string.IsNullOrEmpty(process.ExecutablePath))
-            {
-                results.Add(process);
-                continue;
-            }
-
-            // التحقق من قاعدة البيانات
-            if (!string.IsNullOrEmpty(process.FileHash))
-            {
-                var signatureMatch = _signatureDb.CheckHash(process.FileHash);
-                if (signatureMatch != null)
-                {
-                    if (signatureMatch.Signature.ThreatLevel != ShieldAI.Core.Detection.ThreatLevel.None)
-                    {
-                        process.IsSuspicious = true;
-                        process.IsTrusted = false;
-                        SuspiciousProcessDetected?.Invoke(this, process);
-                    }
-                    else
-                    {
-                        // Whitelisted (ThreatLevel.None)
-                         process.IsTrusted = true;
-                         process.IsSuspicious = false;
-                    }
-                }
-            }
-
-            // فحص الملف إذا لم يكن موثوقًا
-            if (!process.IsTrusted && File.Exists(process.ExecutablePath))
-            {
-                var scanResult = await _fileScanner.ScanFileAsync(process.ExecutablePath, cancellationToken);
-                process.ScanResult = scanResult;
-                
-                if (scanResult.IsInfected)
-                {
-                    process.IsSuspicious = true;
-                    SuspiciousProcessDetected?.Invoke(this, process);
-                }
-                else if (scanResult.IsSuspicious)
-                {
-                    process.IsSuspicious = true;
-                }
-            }
-
-            results.Add(process);
-        }
-
-        return results;
+        return GetAllProcessesAsync(cancellationToken);
     }
 
     /// <summary>
-    /// فحص عملية بمعرفها
+    /// محاولة إنهاء عملية مع حماية العمليات الحرجة
     /// </summary>
-    public async Task<ProcessInfo?> ScanProcessAsync(int processId, CancellationToken cancellationToken = default)
+    /// <param name="processId">معرف العملية</param>
+    /// <param name="force">تجاوز الحماية (خطير)</param>
+    /// <returns>نتيجة المحاولة</returns>
+    public TerminateResult TerminateProcess(int processId, bool force = false)
     {
         try
         {
             using var process = Process.GetProcessById(processId);
-            var info = await GetProcessInfoAsync(process, cancellationToken);
             
-            if (info != null && !string.IsNullOrEmpty(info.ExecutablePath))
+            // التحقق من أن العملية ليست حرجة
+            if (CriticalProcesses.Contains(process.ProcessName))
             {
-                var scanResult = await _fileScanner.ScanFileAsync(info.ExecutablePath, cancellationToken);
-                info.ScanResult = scanResult;
-                info.IsSuspicious = scanResult.IsInfected || scanResult.IsSuspicious;
+                if (!force)
+                {
+                    return new TerminateResult
+                    {
+                        Success = false,
+                        Reason = TerminateFailReason.CriticalProcess,
+                        Message = $"العملية {process.ProcessName} حرجة للنظام ولا يمكن إنهاؤها"
+                    };
+                }
             }
 
-            return info;
+            // التحقق من أن العملية ليست العملية الحالية
+            if (processId == Environment.ProcessId)
+            {
+                return new TerminateResult
+                {
+                    Success = false,
+                    Reason = TerminateFailReason.SelfTermination,
+                    Message = "لا يمكن للتطبيق إنهاء نفسه"
+                };
+            }
+
+            process.Kill();
+            return new TerminateResult
+            {
+                Success = true,
+                Message = $"تم إنهاء العملية {process.ProcessName} بنجاح"
+            };
         }
-        catch
+        catch (ArgumentException)
         {
-            return null;
+            return new TerminateResult
+            {
+                Success = false,
+                Reason = TerminateFailReason.NotFound,
+                Message = "العملية غير موجودة"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new TerminateResult
+            {
+                Success = false,
+                Reason = TerminateFailReason.AccessDenied,
+                Message = $"فشل إنهاء العملية: {ex.Message}"
+            };
         }
     }
 
     /// <summary>
-    /// إنهاء عملية
+    /// التحقق من أن العملية حرجة
     /// </summary>
-    public bool TerminateProcess(int processId)
+    public bool IsCriticalProcess(string processName)
+    {
+        return CriticalProcesses.Contains(processName);
+    }
+
+    /// <summary>
+    /// التحقق من أن العملية حرجة بمعرفها
+    /// </summary>
+    public bool IsCriticalProcess(int processId)
     {
         try
         {
             using var process = Process.GetProcessById(processId);
-            process.Kill();
-            return true;
+            return IsCriticalProcess(process.ProcessName);
         }
         catch
         {
             return false;
         }
     }
+}
 
-    /// <summary>
-    /// التحقق من كون العملية موثوقة
-    /// </summary>
-    private bool IsTrustedProcess(string processName)
-    {
-        var name = processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) 
-            ? processName 
-            : processName + ".exe";
-            
-        return TrustedProcesses.Contains(name);
-    }
+/// <summary>
+/// نتيجة محاولة إنهاء عملية
+/// </summary>
+public class TerminateResult
+{
+    public bool Success { get; set; }
+    public TerminateFailReason Reason { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
 
-    /// <summary>
-    /// الحصول على العمليات المشبوهة فقط
-    /// </summary>
-    public async Task<List<ProcessInfo>> GetSuspiciousProcessesAsync(CancellationToken cancellationToken = default)
-    {
-        var allProcesses = await ScanAllProcessesAsync(cancellationToken);
-        return allProcesses.Where(p => p.IsSuspicious).ToList();
-    }
-
-    /// <summary>
-    /// مراقبة العمليات الجديدة
-    /// </summary>
-    public async Task MonitorNewProcessesAsync(CancellationToken cancellationToken)
-    {
-        var knownProcessIds = new HashSet<int>();
-
-        // الحصول على العمليات الحالية
-        foreach (var process in Process.GetProcesses())
-        {
-            knownProcessIds.Add(process.Id);
-            process.Dispose();
-        }
-
-        // مراقبة العمليات الجديدة
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            await Task.Delay(1000, cancellationToken);
-
-            foreach (var process in Process.GetProcesses())
-            {
-                if (!knownProcessIds.Contains(process.Id))
-                {
-                    knownProcessIds.Add(process.Id);
-                    
-                    var info = await ScanProcessAsync(process.Id, cancellationToken);
-                    if (info?.IsSuspicious == true)
-                    {
-                        SuspiciousProcessDetected?.Invoke(this, info);
-                    }
-                }
-                process.Dispose();
-            }
-
-            // تنظيف العمليات المنتهية
-            var currentIds = Process.GetProcesses().Select(p => { var id = p.Id; p.Dispose(); return id; }).ToHashSet();
-            knownProcessIds.IntersectWith(currentIds);
-        }
-    }
+/// <summary>
+/// أسباب فشل إنهاء العملية
+/// </summary>
+public enum TerminateFailReason
+{
+    None,
+    CriticalProcess,
+    SelfTermination,
+    NotFound,
+    AccessDenied
 }

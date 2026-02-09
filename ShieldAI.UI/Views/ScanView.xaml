@@ -121,8 +121,18 @@
                 
                 <ListView Grid.Row="1" 
                           ItemsSource="{Binding ScanResults}"
+                          SelectedItem="{Binding SelectedScanResult}"
                           Style="{StaticResource ModernListViewStyle}"
                           ItemContainerStyle="{StaticResource ModernListViewItemStyle}">
+                    <ListView.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="🛡️ نقل للحجر الصحي" Command="{Binding QuarantineSelectedFileCommand}"/>
+                            <MenuItem Header="🗑️ حذف الملف" Command="{Binding DeleteSelectedFileCommand}"/>
+                            <Separator/>
+                            <MenuItem Header="📂 فتح موقع الملف" Command="{Binding OpenFileLocationCommand}"/>
+                            <MenuItem Header="📋 نسخ المسار" Command="{Binding CopyFilePathCommand}"/>
+                        </ContextMenu>
+                    </ListView.ContextMenu>
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Header="الحالة" Width="80">

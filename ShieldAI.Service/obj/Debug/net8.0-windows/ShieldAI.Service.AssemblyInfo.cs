@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCopyrightAttribute("Copyright © 2026 ShieldAI")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("ShieldAI Windows Service - Background protection and scanning service")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c357d8416b8e7c2eeb2b053c59d7337e42d70702")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1804c0f674eded42b33fb686442843c33e5d059b")]
 [assembly: System.Reflection.AssemblyProductAttribute("ShieldAI Antivirus")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ShieldAI.Service")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

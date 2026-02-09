@@ -32,7 +32,7 @@ public partial class MainViewModel : ObservableObject
         _signatureDb = new SignatureDatabase();
         _quarantineManager = new QuarantineManager();
         _fileScanner = new FileScanner(_signatureDb);
-        _processScanner = new ProcessScanner(_fileScanner, _signatureDb);
+        _processScanner = new ProcessScanner();
         _realTimeMonitor = new RealTimeMonitor();
 
         // الاشتراك في أحداث المراقبة
@@ -136,6 +136,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string? _selectedPath;
 
+    [ObservableProperty]
+    private LegacyScanResult? _selectedScanResult;
+
     // ==================== أوامر الفحص ====================
 
     [RelayCommand]
@@ -170,6 +173,13 @@ public partial class MainViewModel : ObservableObject
         if (string.IsNullOrEmpty(SelectedPath)) return;
         SelectedViewIndex = 1; // Navigate to ScanView
         await ScanPathsAsync(new[] { SelectedPath }, "الفحص المخصص");
+    }
+
+    [RelayCommand]
+    private void ViewScannedFiles()
+    {
+        // الانتقال إلى صفحة الفحص لعرض نتائج الفحص
+        SelectedViewIndex = 1; // Navigate to ScanView
     }
 
     [RelayCommand]
@@ -253,16 +263,19 @@ public partial class MainViewModel : ObservableObject
         Application.Current.Dispatcher.Invoke(() =>
         {
             ScanResults.Add(result);
+            ScannedFilesCount++;
+            CurrentScanFile = result.FileName; // Update current file display
         });
 
-        if (result.IsInfected)
+        // Quarantine infected OR suspicious files
+        if (result.IsInfected || result.IsSuspicious)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
                 ThreatsFoundCount++;
             });
 
-            // Auto-quarantine infected files
+            // Auto-quarantine infected and suspicious files
             try
             {
                 await _quarantineManager.QuarantineFileAsync(result.FilePath);
@@ -276,6 +289,105 @@ public partial class MainViewModel : ObservableObject
             {
                 // Log error but don't stop scan
             }
+        }
+    }
+
+    // ==================== أوامر قائمة السياق ====================
+
+    [RelayCommand]
+    private async Task QuarantineSelectedFileAsync()
+    {
+        if (SelectedScanResult == null) return;
+        
+        try
+        {
+            await _quarantineManager.QuarantineFileAsync(SelectedScanResult.FilePath);
+            ScanResults.Remove(SelectedScanResult);
+            LoadQuarantinedFiles();
+            MessageBox.Show($"تم نقل الملف للحجر الصحي:\n{SelectedScanResult.FileName}", 
+                "تمت العملية", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"فشل نقل الملف: {ex.Message}", 
+                "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void DeleteSelectedFile()
+    {
+        if (SelectedScanResult == null) return;
+
+        var result = MessageBox.Show(
+            $"هل أنت متأكد من حذف الملف؟\n{SelectedScanResult.FilePath}",
+            "تأكيد الحذف", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        try
+        {
+            if (File.Exists(SelectedScanResult.FilePath))
+            {
+                File.Delete(SelectedScanResult.FilePath);
+            }
+            ScanResults.Remove(SelectedScanResult);
+            MessageBox.Show("تم حذف الملف بنجاح", "تمت العملية", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"فشل حذف الملف: {ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenFileLocation()
+    {
+        if (SelectedScanResult == null) return;
+
+        try
+        {
+            var directory = Path.GetDirectoryName(SelectedScanResult.FilePath);
+            if (Directory.Exists(directory))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{SelectedScanResult.FilePath}\"");
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"فشل فتح الموقع: {ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void CopyFilePath()
+    {
+        if (SelectedScanResult == null) return;
+        
+        Clipboard.SetText(SelectedScanResult.FilePath);
+        MessageBox.Show("تم نسخ المسار للحافظة", "تم", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
+    private void ViewThreats()
+    {
+        // Navigate to ScanView
+        SelectedViewIndex = 1;
+        
+        // Filter to show only threats (infected or suspicious)
+        var threats = ScanResults.Where(r => r.IsInfected || r.IsSuspicious).ToList();
+        if (threats.Count == 0)
+        {
+            MessageBox.Show("لا توجد تهديدات مكتشفة حالياً.\nقم بإجراء فحص للعثور على التهديدات.", 
+                "لا توجد تهديدات", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        
+        // Clear and show only threats
+        ScanResults.Clear();
+        foreach (var threat in threats)
+        {
+            ScanResults.Add(threat);
         }
     }
 
@@ -367,18 +479,40 @@ public partial class MainViewModel : ObservableObject
     private void TerminateProcess(ProcessInfo? process)
     {
         if (process == null) return;
+
+        // التحقق من أن العملية ليست حرجة
+        if (_processScanner.IsCriticalProcess(process.ProcessName))
+        {
+            MessageBox.Show(
+                $"⚠️ العملية {process.ProcessName} حرجة للنظام!\n\nلا يمكن إنهاء هذه العملية لأن ذلك قد يتسبب في تعطل النظام.",
+                "عملية محمية",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
         
-        var result = MessageBox.Show(
-            $"هل تريد إنهاء العملية {process.ProcessName}؟",
-            "تأكيد",
+        var confirmResult = MessageBox.Show(
+            $"هل تريد إنهاء العملية {process.ProcessName}؟\n\nPID: {process.ProcessId}\nالمسار: {process.ExecutablePath ?? "غير معروف"}",
+            "تأكيد إنهاء العملية",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 
-        if (result == MessageBoxResult.Yes)
+        if (confirmResult == MessageBoxResult.Yes)
         {
-            if (_processScanner.TerminateProcess(process.ProcessId))
+            var terminateResult = _processScanner.TerminateProcess(process.ProcessId);
+            
+            if (terminateResult.Success)
             {
                 Processes.Remove(process);
+                ScanStatusText = terminateResult.Message;
+            }
+            else
+            {
+                MessageBox.Show(
+                    terminateResult.Message,
+                    "فشل إنهاء العملية",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
     }

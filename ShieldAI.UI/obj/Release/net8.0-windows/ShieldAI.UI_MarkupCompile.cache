@@ -10,11 +10,11 @@ none
 false
 TRACE;RELEASE;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
 C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.UI\App.xaml
-71136533027
+9-377682483
 
-11-619344960
-212-544133623
-MainWindow.xaml;Styles\ModernStyles.xaml;Views\DashboardView.xaml;Views\ProcessesView.xaml;Views\QuarantineView.xaml;Views\ScanView.xaml;Views\SettingsView.xaml;
+25462754822
+215-625132705
+MainWindow.xaml;Styles\ModernStyles.xaml;Views\AIScanView.xaml;Views\DashboardView.xaml;Views\LogsView.xaml;Views\ProcessesView.xaml;Views\QuarantineView.xaml;Views\ScanView.xaml;Views\SettingsView.xaml;
 
 False
 

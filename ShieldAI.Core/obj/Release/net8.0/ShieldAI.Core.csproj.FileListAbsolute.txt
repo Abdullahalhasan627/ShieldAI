@@ -10,3 +10,4 @@ C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.Core\obj\R
 C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.Core\obj\Release\net8.0\refint\ShieldAI.Core.dll
 C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.Core\obj\Release\net8.0\ShieldAI.Core.pdb
 C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.Core\obj\Release\net8.0\ref\ShieldAI.Core.dll
+C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.Core\obj\Release\net8.0\ShieldAI.Core.sourcelink.json
