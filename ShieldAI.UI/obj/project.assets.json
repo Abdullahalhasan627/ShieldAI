@@ -1637,39 +1637,37 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\": {},
+    "C:\\Users\\alhas\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Mohamed Medhat\\.gemini\\antigravity\\scratch\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj",
+      "projectUniqueName": "C:\\Users\\alhas\\OneDrive\\Desktop\\innovative-idea\\ShieldAI.UI\\ShieldAI.UI.csproj",
       "projectName": "ShieldAI.UI",
-      "projectPath": "C:\\Users\\Mohamed Medhat\\.gemini\\antigravity\\scratch\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj",
-      "packagesPath": "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Mohamed Medhat\\.gemini\\antigravity\\scratch\\ShieldAI\\ShieldAI.UI\\obj\\",
+      "projectPath": "C:\\Users\\alhas\\OneDrive\\Desktop\\innovative-idea\\ShieldAI.UI\\ShieldAI.UI.csproj",
+      "packagesPath": "C:\\Users\\alhas\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\alhas\\OneDrive\\Desktop\\innovative-idea\\ShieldAI.UI\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\Mohamed Medhat\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "C:\\Users\\alhas\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config"
       ],
       "originalTargetFrameworks": [
         "net8.0-windows"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
         "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "projectReferences": {
-            "C:\\Users\\Mohamed Medhat\\.gemini\\antigravity\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj": {
-              "projectPath": "C:\\Users\\Mohamed Medhat\\.gemini\\antigravity\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj"
+            "C:\\Users\\alhas\\OneDrive\\Desktop\\innovative-idea\\ShieldAI.Core\\ShieldAI.Core.csproj": {
+              "projectPath": "C:\\Users\\alhas\\OneDrive\\Desktop\\innovative-idea\\ShieldAI.Core\\ShieldAI.Core.csproj"
             }
           }
         }
@@ -1678,13 +1676,7 @@
         "warnAsError": [
           "NU1605"
         ]
-      },
-      "restoreAuditProperties": {
-        "enableAudit": "true",
-        "auditLevel": "low",
-        "auditMode": "direct"
-      },
-      "SdkAnalysisLevel": "9.0.300"
+      }
     },
     "frameworks": {
       "net8.0-windows7.0": {
@@ -1714,7 +1706,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.308/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.100/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
