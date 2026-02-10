@@ -147,27 +147,25 @@ C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.UI\obj\Deb
 C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.UI\obj\Debug\net8.0-windows\ShieldAI.UI.genruntimeconfig.cache
 C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.UI\obj\Debug\net8.0-windows\ref\ShieldAI.UI.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.UI.exe
-C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.UI.deps.json
-C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.UI.runtimeconfig.json
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.UI.dll
-C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.UI.pdb
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\CommunityToolkit.Mvvm.dll
-C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.Extensions.DependencyInjection.Abstractions.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.Abstractions.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.Core.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.Data.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.DataView.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\System.Collections.Immutable.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\System.Reflection.Metadata.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.Core.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.Extensions.DependencyInjection.Abstractions.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.KMeansClustering.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.PCA.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.StandardTrainers.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.Transforms.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.CpuMath.dll
-C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.DataView.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Microsoft.ML.FastTree.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\Newtonsoft.Json.dll
-C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\System.Collections.Immutable.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\System.Numerics.Tensors.dll
-C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\System.Reflection.Metadata.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\System.ServiceProcess.ServiceController.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\runtimes\linux-arm\native\libLdaNative.so
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\runtimes\linux-arm64\native\libLdaNative.so
@@ -182,7 +180,6 @@ C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-win
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\runtimes\win-x64\native\FastTreeNative.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\runtimes\win-x86\native\FastTreeNative.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\runtimes\win\lib\net8.0\System.ServiceProcess.ServiceController.dll
-C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.Core.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.Core.pdb
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\ShieldAI.UI.csproj.AssemblyReference.cache
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\Styles\ModernStyles.baml
@@ -215,9 +212,12 @@ C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-win
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\ShieldAI.UI.AssemblyInfo.cs
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\ShieldAI.UI.csproj.CoreCompileInputs.cache
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\ShieldAI.UI.sourcelink.json
-C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\ShieldAI.UI.csproj.CopyComplete
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\ShieldAI.UI.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\refint\ShieldAI.UI.dll
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\ShieldAI.UI.pdb
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.UI.deps.json
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.UI.runtimeconfig.json
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\bin\Debug\net8.0-windows\ShieldAI.UI.pdb
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\ShieldAI.UI.csproj.CopyComplete
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\ShieldAI.UI.genruntimeconfig.cache
 C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Debug\net8.0-windows\ref\ShieldAI.UI.dll

@@ -67,7 +67,7 @@
                 </Border>
                 
                 <!-- الحجر الصحي -->
-                <Border Style="{StaticResource CardStyle}">
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,12,0">
                     <StackPanel>
                         <TextBlock Text="🔒" FontSize="32"/>
                         <TextBlock Text="{Binding QuarantineCount}" 

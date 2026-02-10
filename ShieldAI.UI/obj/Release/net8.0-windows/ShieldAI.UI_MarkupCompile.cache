@@ -4,17 +4,17 @@
 winexe
 C#
 .cs
-C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.UI\obj\Release\net8.0-windows\
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\obj\Release\net8.0-windows\
 ShieldAI.UI
 none
 false
-TRACE;RELEASE;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
-C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.UI\App.xaml
-9-377682483
+TRACE;RELEASE;NET;NET8_0;NETCOREAPP
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.UI\App.xaml
+1013766550
 
-25462754822
-215-625132705
-MainWindow.xaml;Styles\ModernStyles.xaml;Views\AIScanView.xaml;Views\DashboardView.xaml;Views\LogsView.xaml;Views\ProcessesView.xaml;Views\QuarantineView.xaml;Views\ScanView.xaml;Views\SettingsView.xaml;
+31-1392560634
+224-329358850
+MainWindow.xaml;Styles\ModernStyles.xaml;Views\AIScanView.xaml;Views\DashboardView.xaml;Views\HistoryView.xaml;Views\LogsView.xaml;Views\ProcessesView.xaml;Views\QuarantineView.xaml;Views\ScanView.xaml;Views\SettingsView.xaml;
 
 False
 
