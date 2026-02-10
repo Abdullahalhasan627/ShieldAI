@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "rf4S3QY5fgC8WO/8jCdc9oni8aQsjujK/wTppYH0UieSHSqhysD1V/jCSHi4WH8JTsrRMnkKQhcRM0s69kIurg==",
+  "dgSpecHash": "GY6RFcbifg969fOgRuQQxQcV0T1zW3O4kni0YwClltkoCNt7JmeCy8PPm1Nokvqh3KQN6LQrcRgWgPxU4X/32A==",
   "success": true,
   "projectFilePath": "C:\\Users\\alhas\\OneDrive\\Desktop\\innovative-idea\\ShieldAI.Service\\ShieldAI.Service.csproj",
   "expectedPackageFiles": [
@@ -52,6 +52,7 @@
     "C:\\Users\\alhas\\.nuget\\packages\\system.reflection.metadata\\10.0.2\\system.reflection.metadata.10.0.2.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.reflection.primitives\\4.3.0\\system.reflection.primitives.4.3.0.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.runtime\\4.3.0\\system.runtime.4.3.0.nupkg.sha512",
+    "C:\\Users\\alhas\\.nuget\\packages\\system.security.cryptography.protecteddata\\8.0.0\\system.security.cryptography.protecteddata.8.0.0.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.serviceprocess.servicecontroller\\8.0.0\\system.serviceprocess.servicecontroller.8.0.0.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.text.encoding\\4.3.0\\system.text.encoding.4.3.0.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.text.encodings.web\\8.0.0\\system.text.encodings.web.8.0.0.nupkg.sha512",
@@ -59,5 +60,12 @@
     "C:\\Users\\alhas\\.nuget\\packages\\system.threading.channels\\4.7.1\\system.threading.channels.4.7.1.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.threading.tasks\\4.3.0\\system.threading.tasks.4.3.0.nupkg.sha512"
   ],
-  "logs": []
+  "logs": [
+    {
+      "code": "Undefined",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Problem reading the cache file C:\\Users\\alhas\\OneDrive\\Desktop\\innovative-idea\\ShieldAI.Service\\obj\\project.nuget.cache : Invalid property identifier character: <. Path 'version', line 3, position 0."
+    }
+  ]
 }

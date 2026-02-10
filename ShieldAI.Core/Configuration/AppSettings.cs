@@ -138,6 +138,82 @@ namespace ShieldAI.Core.Configuration
         public int DefenderTimeoutSeconds { get; set; } = 60;
         #endregion
 
+        #region Engine Weights
+        /// <summary>
+        /// وزن محرك التوقيعات (0.0 - 1.0)
+        /// </summary>
+        public double SignatureEngineWeight { get; set; } = 1.0;
+
+        /// <summary>
+        /// وزن محرك التحليل السلوكي (0.0 - 1.0)
+        /// </summary>
+        public double HeuristicEngineWeight { get; set; } = 0.8;
+
+        /// <summary>
+        /// وزن محرك التعلم الآلي (0.0 - 1.0)
+        /// </summary>
+        public double MlEngineWeight { get; set; } = 0.7;
+
+        /// <summary>
+        /// وزن محرك السمعة (0.0 - 1.0)
+        /// </summary>
+        public double ReputationEngineWeight { get; set; } = 0.5;
+
+        /// <summary>
+        /// وزن محرك AMSI (0.0 - 1.0)
+        /// </summary>
+        public double AmsiEngineWeight { get; set; } = 0.6;
+
+        /// <summary>
+        /// حد الحظر (0-100)
+        /// </summary>
+        public int BlockThreshold { get; set; } = 80;
+
+        /// <summary>
+        /// حد الحجر (0-100)
+        /// </summary>
+        public int QuarantineThreshold { get; set; } = 55;
+
+        /// <summary>
+        /// حد المراجعة (0-100)
+        /// </summary>
+        public int ReviewThreshold { get; set; } = 30;
+        #endregion
+
+        #region Pipeline Settings
+        /// <summary>
+        /// فترة تجميع الأحداث بالمللي ثانية
+        /// </summary>
+        public int EventCoalesceMs { get; set; } = 500;
+
+        /// <summary>
+        /// عدد عمال الفحص في Pipeline
+        /// </summary>
+        public int PipelineScanWorkers { get; set; } = 2;
+
+        /// <summary>
+        /// سعة قناة الأحداث في Pipeline
+        /// </summary>
+        public int PipelineQueueCapacity { get; set; } = 10_000;
+
+        /// <summary>
+        /// حد الضغط العالي لتعطيل المحركات الثقيلة مؤقتاً
+        /// </summary>
+        public int PipelineHighPressureThreshold { get; set; } = 2_000;
+        #endregion
+
+        #region Scan Cache
+        /// <summary>
+        /// تفعيل كاش نتائج الفحص
+        /// </summary>
+        public bool EnableScanCache { get; set; } = true;
+
+        /// <summary>
+        /// مدة صلاحية الكاش بالدقائق
+        /// </summary>
+        public int ScanCacheTtlMinutes { get; set; } = 30;
+        #endregion
+
         #region Logging
         /// <summary>
         /// مستوى التسجيل

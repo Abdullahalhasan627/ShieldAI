@@ -23,29 +23,57 @@
         <!-- قائمة الملفات المحجورة -->
         <Border Grid.Row="1" Style="{StaticResource CardStyle}">
             <Grid>
-                <ListView ItemsSource="{Binding QuarantinedFiles}"
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- شريط الملخص والإجراءات -->
+                <Grid Grid.Row="0" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <TextBlock Text="عدد الملفات: " Style="{StaticResource BodyStyle}"/>
+                        <TextBlock Text="{Binding TotalFiles}" Foreground="{StaticResource TextPrimaryBrush}" Margin="4,0,16,0"/>
+                        <TextBlock Text="الحجم الإجمالي: " Style="{StaticResource BodyStyle}"/>
+                        <TextBlock Text="{Binding TotalSize}" Foreground="{StaticResource TextPrimaryBrush}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="تحديث"
+                                Command="{Binding RefreshCommand}"
+                                Style="{StaticResource ModernButtonStyle}"
+                                Padding="12,6"
+                                Margin="0,0,8,0"/>
+                        <Button Content="حذف الكل"
+                                Command="{Binding DeleteAllCommand}"
+                                Style="{StaticResource DangerButtonStyle}"
+                                Padding="12,6"/>
+                    </StackPanel>
+                </Grid>
+
+                <ListView Grid.Row="1" ItemsSource="{Binding QuarantinedFiles}"
+                          SelectedItem="{Binding SelectedItem}"
                           Style="{StaticResource ModernListViewStyle}"
                           ItemContainerStyle="{StaticResource ModernListViewItemStyle}">
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Header="الملف" Width="200" 
-                                            DisplayMemberBinding="{Binding OriginalName}"/>
+                                            DisplayMemberBinding="{Binding FileName}"/>
                             
                             <GridViewColumn Header="المسار الأصلي" Width="300" 
                                             DisplayMemberBinding="{Binding OriginalPath}"/>
                             
-                            <GridViewColumn Header="الحجم" Width="100">
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding OriginalSize, Converter={StaticResource FileSizeConverter}}"/>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
+                            <GridViewColumn Header="الحجم" Width="100" 
+                                            DisplayMemberBinding="{Binding SizeText}"/>
                             
                             <GridViewColumn Header="تاريخ الحجر" Width="150">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding QuarantineTime, StringFormat='{}{0:yyyy/MM/dd HH:mm}'}"/>
+                                        <TextBlock Text="{Binding QuarantinedDate, StringFormat='{}{0:yyyy/MM/dd HH:mm}'}"/>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
@@ -58,12 +86,12 @@
                                                     Style="{StaticResource SuccessButtonStyle}"
                                                     Padding="12,6"
                                                     Margin="0,0,8,0"
-                                                    Command="{Binding DataContext.RestoreFileCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                    Command="{Binding DataContext.RestoreCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
                                                     CommandParameter="{Binding}"/>
                                             <Button Content="حذف" 
                                                     Style="{StaticResource DangerButtonStyle}"
                                                     Padding="12,6"
-                                                    Command="{Binding DataContext.DeleteQuarantinedFileCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                    Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
                                                     CommandParameter="{Binding}"/>
                                         </StackPanel>
                                     </DataTemplate>
@@ -74,9 +102,9 @@
                 </ListView>
                 
                 <!-- رسالة عند عدم وجود ملفات -->
-                <StackPanel VerticalAlignment="Center" 
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" 
                             HorizontalAlignment="Center"
-                            Visibility="{Binding QuarantineCount, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                            Visibility="{Binding IsLoading, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                     <TextBlock Text="🔒" FontSize="64" HorizontalAlignment="Center"/>
                     <TextBlock Text="لا توجد ملفات في الحجر الصحي" 
                                Style="{StaticResource SubHeaderStyle}"

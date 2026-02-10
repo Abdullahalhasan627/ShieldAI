@@ -77,3 +77,163 @@ C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.Service\ob
 C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.genruntimeconfig.cache
 C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ref\ShieldAI.Service.dll
 C:\Users\Mohamed Medhat\.gemini\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.sourcelink.json
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\refint\ShieldAI.Service.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.pdb
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Service.exe
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Service.deps.json
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Service.runtimeconfig.json
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Service.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Service.pdb
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.Abstractions.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.Binder.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.CommandLine.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.EnvironmentVariables.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.FileExtensions.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.Json.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.UserSecrets.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.DependencyInjection.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Diagnostics.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Diagnostics.Abstractions.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.FileProviders.Abstractions.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.FileProviders.Physical.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.FileSystemGlobbing.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Hosting.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Hosting.Abstractions.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Hosting.WindowsServices.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.Abstractions.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.Configuration.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.Console.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.Debug.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.EventLog.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.EventSource.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Options.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Options.ConfigurationExtensions.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Primitives.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.Core.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.Data.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.KMeansClustering.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.PCA.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.StandardTrainers.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.Transforms.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.CpuMath.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.DataView.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.FastTree.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\Newtonsoft.Json.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\System.CodeDom.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\System.Collections.Immutable.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\System.Diagnostics.EventLog.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\System.Numerics.Tensors.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\System.Reflection.Metadata.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\System.Security.Cryptography.ProtectedData.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\System.ServiceProcess.ServiceController.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\linux-arm\native\libLdaNative.so
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\linux-arm64\native\libLdaNative.so
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\linux-x64\native\libLdaNative.so
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\osx-arm64\native\libLdaNative.dylib
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\osx-x64\native\libLdaNative.dylib
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win-arm64\native\LdaNative.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win-x64\native\LdaNative.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win-x86\native\LdaNative.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\linux-x64\native\libFastTreeNative.so
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\osx-x64\native\libFastTreeNative.dylib
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win-x64\native\FastTreeNative.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win-x86\native\FastTreeNative.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win\lib\net8.0\System.Diagnostics.EventLog.Messages.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win\lib\net8.0\System.Diagnostics.EventLog.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win\lib\net8.0\System.ServiceProcess.ServiceController.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Core.dll
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Core.pdb
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.csproj.AssemblyReference.cache
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.AssemblyInfoInputs.cache
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.AssemblyInfo.cs
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.csproj.CoreCompileInputs.cache
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.sourcelink.json
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.7C30414E.Up2Date
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.genruntimeconfig.cache
+C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Service\obj\Debug\net8.0-windows\ref\ShieldAI.Service.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Service.exe
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Service.deps.json
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Service.runtimeconfig.json
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Service.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Service.pdb
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.Abstractions.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.Binder.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.CommandLine.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.EnvironmentVariables.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.FileExtensions.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.Json.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Configuration.UserSecrets.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.DependencyInjection.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Diagnostics.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Diagnostics.Abstractions.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.FileProviders.Abstractions.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.FileProviders.Physical.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.FileSystemGlobbing.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Hosting.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Hosting.Abstractions.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Hosting.WindowsServices.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.Abstractions.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.Configuration.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.Console.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.Debug.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.EventLog.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Logging.EventSource.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Options.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Options.ConfigurationExtensions.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.Extensions.Primitives.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.Core.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.Data.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.KMeansClustering.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.PCA.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.StandardTrainers.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.Transforms.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.CpuMath.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.DataView.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Microsoft.ML.FastTree.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\Newtonsoft.Json.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\System.CodeDom.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\System.Collections.Immutable.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\System.Diagnostics.EventLog.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\System.Numerics.Tensors.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\System.Reflection.Metadata.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\System.Security.Cryptography.ProtectedData.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\System.ServiceProcess.ServiceController.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\linux-arm\native\libLdaNative.so
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\linux-arm64\native\libLdaNative.so
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\linux-x64\native\libLdaNative.so
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\osx-arm64\native\libLdaNative.dylib
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\osx-x64\native\libLdaNative.dylib
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win-arm64\native\LdaNative.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win-x64\native\LdaNative.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win-x86\native\LdaNative.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\linux-x64\native\libFastTreeNative.so
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\osx-x64\native\libFastTreeNative.dylib
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win-x64\native\FastTreeNative.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win-x86\native\FastTreeNative.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win\lib\net8.0\System.Diagnostics.EventLog.Messages.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win\lib\net8.0\System.Diagnostics.EventLog.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\runtimes\win\lib\net8.0\System.ServiceProcess.ServiceController.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Core.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\bin\Debug\net8.0-windows\ShieldAI.Core.pdb
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.csproj.AssemblyReference.cache
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.AssemblyInfoInputs.cache
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.AssemblyInfo.cs
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.csproj.CoreCompileInputs.cache
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.sourcelink.json
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.csproj.CopyComplete
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\refint\ShieldAI.Service.dll
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.pdb
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ShieldAI.Service.genruntimeconfig.cache
+C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Service\obj\Debug\net8.0-windows\ref\ShieldAI.Service.dll

@@ -20,6 +20,7 @@ namespace ShieldAI.Core.Contracts
         public Guid Id { get; set; } = Guid.NewGuid();
         public string CommandType { get; set; } = "";
         public DateTime Timestamp { get; set; } = DateTime.Now;
+        public string? SessionToken { get; set; }
         public string? Payload { get; set; }
 
         public T? GetPayload<T>() where T : class
@@ -91,10 +92,23 @@ namespace ShieldAI.Core.Contracts
 
     #endregion
 
+    #region Auth
+
+    public class HelloResponse
+    {
+        public string SessionToken { get; set; } = "";
+        public int ExpiresInSeconds { get; set; } = 3600;
+    }
+
+    #endregion
+
     #region Command Types
 
     public static class Commands
     {
+        // المصادقة
+        public const string Hello = "hello";
+
         // الخدمة
         public const string Ping = "ping";
         public const string GetStatus = "get_status";

@@ -92,6 +92,7 @@ namespace ShieldAI.UI.Services
         public const string Scan = "Scan";
         public const string Quarantine = "Quarantine";
         public const string Processes = "Processes";
+        public const string History = "History";
         public const string Settings = "Settings";
         public const string Logs = "Logs";
     }

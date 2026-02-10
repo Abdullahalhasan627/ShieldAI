@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "eTl9R/MQyo/xI8APUt2IjAELSYALX6Fb5KCfacGW7lm+NmLjAsT+BcTJw47rF+h41l+wPf2kgHj+jADcxJnefA==",
+  "dgSpecHash": "kxgqHBbnTd4L6XMRw6LtNfsIeOYP8VrytmKJ9joOKfv0chBEBAWCox3l6zNvYPVlfsjWtOxRHv8yy5NgFj5s5A==",
   "success": true,
   "projectFilePath": "C:\\Users\\alhas\\OneDrive\\Desktop\\innovative-idea\\ShieldAI.UI\\ShieldAI.UI.csproj",
   "expectedPackageFiles": [
@@ -26,10 +26,18 @@
     "C:\\Users\\alhas\\.nuget\\packages\\system.reflection.metadata\\10.0.2\\system.reflection.metadata.10.0.2.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.reflection.primitives\\4.3.0\\system.reflection.primitives.4.3.0.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.runtime\\4.3.0\\system.runtime.4.3.0.nupkg.sha512",
+    "C:\\Users\\alhas\\.nuget\\packages\\system.security.cryptography.protecteddata\\8.0.0\\system.security.cryptography.protecteddata.8.0.0.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.serviceprocess.servicecontroller\\8.0.0\\system.serviceprocess.servicecontroller.8.0.0.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.text.encoding\\4.3.0\\system.text.encoding.4.3.0.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.threading.channels\\4.7.1\\system.threading.channels.4.7.1.nupkg.sha512",
     "C:\\Users\\alhas\\.nuget\\packages\\system.threading.tasks\\4.3.0\\system.threading.tasks.4.3.0.nupkg.sha512"
   ],
-  "logs": []
+  "logs": [
+    {
+      "code": "Undefined",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Problem reading the cache file C:\\Users\\alhas\\OneDrive\\Desktop\\innovative-idea\\ShieldAI.UI\\obj\\project.nuget.cache : Invalid property identifier character: <. Path 'version', line 3, position 0."
+    }
+  ]
 }

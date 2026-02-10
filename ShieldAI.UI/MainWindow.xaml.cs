@@ -39,12 +39,7 @@ public partial class MainWindow : Window
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
-        // إيقاف المراقبة قبل الإغلاق
-        if (DataContext is ViewModels.MainViewModel vm)
-        {
-            vm.StopMonitoring();
-        }
-        Close();
+        Hide();
     }
 
     private void ToggleMaximize()

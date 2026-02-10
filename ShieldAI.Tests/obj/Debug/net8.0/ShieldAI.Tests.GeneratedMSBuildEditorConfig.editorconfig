@@ -8,6 +8,10 @@ build_property.PlatformNeutralAssembly =
 build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = ShieldAI.Tests
+<<<<<<< HEAD
 build_property.ProjectDir = C:\Users\alhas\OneDrive\Desktop\innovative-idea\ShieldAI.Tests\
+=======
+build_property.ProjectDir = C:\Users\Mohamed Medhat\Desktop\antigravity\scratch\ShieldAI\ShieldAI.Tests\
+>>>>>>> d1da9d0523302b30037359837fdd2445358b4b18
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 

@@ -601,12 +601,15 @@ public partial class MainViewModel : ObservableObject
             TotalThreatsDetected++;
             LoadQuarantinedFiles();
 
-            // إظهار إشعار
-            MessageBox.Show(
-                $"تم اكتشاف تهديد!\n\nالملف: {Path.GetFileName(e.Result?.FilePath ?? "")}\nالتهديد: {e.Result?.ThreatName ?? "غير معروف"}\n\n{(e.Result?.Verdict == ScanVerdict.Malicious ? "تم نقل الملف للحجر الصحي" : "الملف مشبوه")}",
-                "تحذير - ShieldAI",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            var fileName = Path.GetFileName(e.Result?.FilePath ?? "");
+            var verdictText = e.Result?.Verdict == ScanVerdict.Malicious
+                ? "تم نقل الملف للحجر الصحي"
+                : "الملف مشبوه";
+
+            App.Notifications?.ShowThreatNotification(
+                "تهديد مكتشف - ShieldAI",
+                $"الملف: {fileName}\nالتهديد: {e.Result?.ThreatName ?? "غير معروف"}\n{verdictText}",
+                () => SelectedViewIndex = 3);
         });
     }
 

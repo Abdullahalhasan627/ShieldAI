@@ -30,7 +30,12 @@ namespace ShieldAI.UI.ViewModels
         public QuarantinedFileItem? SelectedItem
         {
             get => _selectedItem;
-            set { _selectedItem = value; OnPropertyChanged(); }
+            set
+            {
+                _selectedItem = value;
+                OnPropertyChanged();
+                RaiseCommandState();
+            }
         }
 
         public bool IsLoading
@@ -60,6 +65,13 @@ namespace ShieldAI.UI.ViewModels
             DeleteAllCommand = new RelayCommand(ExecuteDeleteAll, () => QuarantinedFiles.Count > 0);
             RefreshCommand = new RelayCommand(ExecuteRefresh);
 
+            QuarantinedFiles.CollectionChanged += (_, _) =>
+            {
+                OnPropertyChanged(nameof(TotalFiles));
+                OnPropertyChanged(nameof(TotalSize));
+                RaiseCommandState();
+            };
+
             _ = LoadDataAsync();
         }
 
@@ -75,8 +87,6 @@ namespace ShieldAI.UI.ViewModels
             {
                 // TODO: Send restore command to service
                 QuarantinedFiles.Remove(SelectedItem);
-                OnPropertyChanged(nameof(TotalFiles));
-                OnPropertyChanged(nameof(TotalSize));
             }
         }
 
@@ -91,8 +101,6 @@ namespace ShieldAI.UI.ViewModels
             if (confirm)
             {
                 QuarantinedFiles.Remove(SelectedItem);
-                OnPropertyChanged(nameof(TotalFiles));
-                OnPropertyChanged(nameof(TotalSize));
             }
         }
 
@@ -105,8 +113,6 @@ namespace ShieldAI.UI.ViewModels
             if (confirm)
             {
                 QuarantinedFiles.Clear();
-                OnPropertyChanged(nameof(TotalFiles));
-                OnPropertyChanged(nameof(TotalSize));
             }
         }
 
@@ -137,6 +143,13 @@ namespace ShieldAI.UI.ViewModels
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private void RaiseCommandState()
+        {
+            (RestoreCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (DeleteCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (DeleteAllCommand as RelayCommand)?.RaiseCanExecuteChanged();
         }
     }
 
