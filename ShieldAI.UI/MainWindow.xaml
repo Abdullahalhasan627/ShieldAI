@@ -156,9 +156,19 @@
                             </StackPanel>
                         </RadioButton>
                         
-                        <RadioButton x:Name="SettingsRadio"
+                        <RadioButton x:Name="HistoryRadio"
                                      Style="{StaticResource SidebarButtonStyle}"
                                      IsChecked="{Binding SelectedViewIndex, Converter={StaticResource IndexToBoolConverter}, ConverterParameter=4, Mode=TwoWay}"
+                                     GroupName="Navigation">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📋" FontSize="16" Margin="0,0,12,0"/>
+                                <TextBlock Text="سجل التهديدات" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+                        
+                        <RadioButton x:Name="SettingsRadio"
+                                     Style="{StaticResource SidebarButtonStyle}"
+                                     IsChecked="{Binding SelectedViewIndex, Converter={StaticResource IndexToBoolConverter}, ConverterParameter=5, Mode=TwoWay}"
                                      GroupName="Navigation">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="⚡" FontSize="16" Margin="0,0,12,0"/>
@@ -200,6 +210,9 @@
                     
                     <!-- صفحة الحجر الصحي -->
                     <views:QuarantineView Visibility="{Binding ElementName=QuarantineRadio, Path=IsChecked, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    
+                    <!-- صفحة سجل التهديدات -->
+                    <views:HistoryView Visibility="{Binding ElementName=HistoryRadio, Path=IsChecked, Converter={StaticResource BoolToVisibilityConverter}}"/>
                     
                     <!-- صفحة الإعدادات -->
                     <views:SettingsView Visibility="{Binding ElementName=SettingsRadio, Path=IsChecked, Converter={StaticResource BoolToVisibilityConverter}}"/>

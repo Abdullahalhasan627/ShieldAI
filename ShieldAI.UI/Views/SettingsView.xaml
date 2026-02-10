@@ -32,6 +32,43 @@
                     </Grid>
                 </StackPanel>
             </Border>
+
+            <!-- إعدادات التحديثات -->
+            <Border Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="⬆️" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="التحديثات" Style="{StaticResource SubHeaderStyle}"/>
+                    </StackPanel>
+
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="التحديث التلقائي" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                            <TextBlock Text="تحديث قاعدة التوقيعات ونموذج الذكاء الاصطناعي تلقائياً" Style="{StaticResource BodyStyle}"/>
+                        </StackPanel>
+
+                        <ToggleButton Grid.Column="1"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      IsChecked="{Binding AutoUpdateEnabled, Mode=TwoWay}"/>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="تحديث الآن"
+                                Command="{Binding UpdateNowCommand}"
+                                Style="{StaticResource ModernButtonStyle}"
+                                Padding="16,8"/>
+                        <TextBlock Text="{Binding UpdateStatus}"
+                                   Style="{StaticResource BodyStyle}"
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
             
             <!-- إعدادات الفحص -->
             <Border Style="{StaticResource CardStyle}">

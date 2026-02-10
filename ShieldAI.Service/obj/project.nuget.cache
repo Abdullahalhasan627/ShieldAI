@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "wrMNQzA7yVE=",
+  "dgSpecHash": "JaZ762ueQoc=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Mohamed Medhat\\.gemini\\antigravity\\scratch\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj",
+  "projectFilePath": "C:\\Users\\Mohamed Medhat\\Desktop\\antigravity\\scratch\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\microsoft.extensions.configuration\\8.0.0\\microsoft.extensions.configuration.8.0.0.nupkg.sha512",
     "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\8.0.0\\microsoft.extensions.configuration.abstractions.8.0.0.nupkg.sha512",
@@ -52,6 +52,7 @@
     "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\system.reflection.metadata\\10.0.2\\system.reflection.metadata.10.0.2.nupkg.sha512",
     "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\system.reflection.primitives\\4.3.0\\system.reflection.primitives.4.3.0.nupkg.sha512",
     "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\system.runtime\\4.3.0\\system.runtime.4.3.0.nupkg.sha512",
+    "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\system.security.cryptography.protecteddata\\8.0.0\\system.security.cryptography.protecteddata.8.0.0.nupkg.sha512",
     "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\system.serviceprocess.servicecontroller\\8.0.0\\system.serviceprocess.servicecontroller.8.0.0.nupkg.sha512",
     "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\system.text.encoding\\4.3.0\\system.text.encoding.4.3.0.nupkg.sha512",
     "C:\\Users\\Mohamed Medhat\\.nuget\\packages\\system.text.encodings.web\\8.0.0\\system.text.encodings.web.8.0.0.nupkg.sha512",
