@@ -11,26 +11,22 @@
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
-# Build results
-[Dd]ebug/
-[Dd]ebugPublic/
-[Rr]elease/
-[Rr]eleases/
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug*/
+[Rr]elease*/
 x64/
 x86/
 [Ww]in32/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
 bld/
-[Bb]in/
-[Oo]bj/
 [Ll]og/
 [Ll]ogs/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
-# Visual Studio 2022 cache/options directory
-.vb/
 
 # Visual Studio Code
 .vscode/*
@@ -42,6 +38,10 @@ bld/
 
 # Local History for Visual Studio Code
 .history/
+
+# JetBrains Rider / IntelliJ
+.idea/
+*.sln.iml
 
 # Windows image file caches
 Thumbs.db
@@ -60,6 +60,13 @@ $RECYCLE.BIN/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+
+# Test results
+TestResults/
+
+# NuGet packages
+*.nupkg
+*.snupkg
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
