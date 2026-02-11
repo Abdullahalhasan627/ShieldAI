@@ -89,20 +89,45 @@ namespace ShieldAI.UI.Services
             try
             {
                 var url = $"https://api.github.com/repos/{_owner}/{_repo}/releases/latest";
-                var response = await _httpClient.GetStringAsync(url);
-                var release = JsonSerializer.Deserialize<GitHubRelease>(response, new JsonSerializerOptions
+                var response = await _httpClient.GetAsync(url);
+                
+                // التحقق من نجاح الطلب
+                if (!response.IsSuccessStatusCode)
+                {
+                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        Debug.WriteLine("لا يوجد releases في هذا المستودع بعد");
+                        return new UpdateCheckResult 
+                        { 
+                            HasUpdate = false, 
+                            LatestVersion = "لا يوجد إصدارات",
+                            ReleaseNotes = "لم يتم نشر أي إصدار على GitHub بعد"
+                        };
+                    }
+                    
+                    Debug.WriteLine($"خطأ في API: {response.StatusCode}");
+                    return new UpdateCheckResult { HasUpdate = false };
+                }
+                
+                var content = await response.Content.ReadAsStringAsync();
+                var release = JsonSerializer.Deserialize<GitHubRelease>(content, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
 
-                if (release == null)
-                    return new UpdateCheckResult { HasUpdate = false };
+                if (release == null || string.IsNullOrWhiteSpace(release.TagName))
+                    return new UpdateCheckResult 
+                    { 
+                        HasUpdate = false,
+                        LatestVersion = "غير معروف",
+                        ReleaseNotes = "تعذر قراءة معلومات الإصدار"
+                    };
 
                 // مقارنة الإصدارات
                 var hasUpdate = IsNewerVersion(release.TagName, _currentVersion);
                 
                 // البحث عن ملف التحديث (ShieldAI.zip أو ShieldAI.exe)
-                var asset = release.Assets.FirstOrDefault(a => 
+                var asset = release.Assets?.FirstOrDefault(a => 
                     a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
                     a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
 
@@ -111,15 +136,30 @@ namespace ShieldAI.UI.Services
                     HasUpdate = hasUpdate,
                     CurrentVersion = _currentVersion,
                     LatestVersion = release.TagName,
-                    ReleaseNotes = release.Body,
+                    ReleaseNotes = release.Body ?? "لا توجد ملاحظات إصدار",
                     DownloadUrl = asset?.BrowserDownloadUrl ?? "",
                     ReleaseDate = release.PublishedAt
+                };
+            }
+            catch (HttpRequestException ex)
+            {
+                Debug.WriteLine($"خطأ في الاتصال: {ex.Message}");
+                return new UpdateCheckResult 
+                { 
+                    HasUpdate = false,
+                    LatestVersion = "خطأ في الاتصال",
+                    ReleaseNotes = "تعذر الاتصال بـ GitHub"
                 };
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"خطأ في التحقق من التحديثات: {ex.Message}");
-                return new UpdateCheckResult { HasUpdate = false };
+                return new UpdateCheckResult 
+                { 
+                    HasUpdate = false,
+                    LatestVersion = "خطأ",
+                    ReleaseNotes = $"حدث خطأ: {ex.Message}"
+                };
             }
         }
 

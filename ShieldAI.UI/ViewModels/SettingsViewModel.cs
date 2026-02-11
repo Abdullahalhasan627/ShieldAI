@@ -149,7 +149,7 @@ namespace ShieldAI.UI.ViewModels
         {
             _dialogService = new DialogService();
             _updateManager = new UpdateManager();
-            _gitHubUpdateService = new GitHubUpdateService("Abdullahalhasan627", "ShieldAI");
+            _gitHubUpdateService = new GitHubUpdateService("Abdullahalhasan627", "innovative-idea");
             
             _quarantinePath = @"C:\ProgramData\ShieldAI\Quarantine";
 
