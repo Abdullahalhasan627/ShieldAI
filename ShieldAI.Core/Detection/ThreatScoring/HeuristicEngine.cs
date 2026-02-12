@@ -79,6 +79,9 @@ namespace ShieldAI.Core.Detection.ThreatScoring
                 // === تحليل الحجم ===
                 totalScore += AnalyzeFileSize(context, result);
 
+                // === تحليل إشارات السياق ===
+                totalScore += AnalyzeContextSignals(context, result);
+
                 // تحديد النتيجة النهائية
                 result.Score = Math.Clamp(totalScore, 0, 100);
 
@@ -310,6 +313,69 @@ namespace ShieldAI.Core.Detection.ThreatScoring
             {
                 score += 10;
                 result.Reasons.Add($"ملف تنفيذي صغير جداً ({context.FileSize / 1024.0:F1} KB) - قد يكون dropper");
+            }
+
+            return score;
+        }
+
+        private int AnalyzeContextSignals(ThreatScanContext context, ThreatScanResult result)
+        {
+            int score = 0;
+
+            // ملف غير موقع في مسار بدء التشغيل = مريب جداً
+            if (context.IsStartupLocation && context.IsUnsignedOrUntrustedPublisher)
+            {
+                score += 20;
+                result.Reasons.Add("ملف غير موقّع في مسار بدء التشغيل (Startup) - مريب جداً");
+            }
+            else if (context.IsStartupLocation)
+            {
+                score += 8;
+                result.Reasons.Add("ملف في مسار بدء التشغيل (Startup)");
+            }
+
+            // ملف تنفيذي غير موقع من Temp/AppData
+            if (context.IsFromTempOrAppData && context.IsUnsignedOrUntrustedPublisher
+                && context.PEInfo?.IsValidPE == true)
+            {
+                score += 15;
+                result.Reasons.Add("ملف تنفيذي غير موقّع من Temp/AppData - نمط dropper شائع");
+            }
+            else if (context.IsFromTempOrAppData && context.PEInfo?.IsValidPE == true)
+            {
+                score += 5;
+                result.Reasons.Add("ملف تنفيذي من Temp/AppData");
+            }
+
+            // ملف تنفيذي جديد جداً وغير موقع
+            if (context.PEInfo?.IsValidPE == true && context.IsUnsignedOrUntrustedPublisher)
+            {
+                var age = DateTime.Now - context.CreationTime;
+                if (age.TotalMinutes < 2 && context.CreationTime != DateTime.MinValue)
+                {
+                    score += 12;
+                    result.Reasons.Add("ملف تنفيذي غير موقّع تم إنشاؤه منذ أقل من دقيقتين");
+                }
+            }
+
+            // فحص overlay (بيانات بعد نهاية PE)
+            if (context.PEInfo?.IsValidPE == true && context.FileSize > 0)
+            {
+                try
+                {
+                    var peInfo = context.PEInfo;
+                    // إذا كان حجم الملف أكبر بكثير من مجموع الـ Sections
+                    if (peInfo.SectionCount > 0 && peInfo.FileSize > 0)
+                    {
+                        double ratio = (double)context.FileSize / peInfo.FileSize;
+                        if (ratio > 2.0)
+                        {
+                            score += 8;
+                            result.Reasons.Add($"الملف يحتوي على overlay كبير (بيانات إضافية بعد نهاية PE) - نسبة {ratio:F1}x");
+                        }
+                    }
+                }
+                catch { }
             }
 
             return score;

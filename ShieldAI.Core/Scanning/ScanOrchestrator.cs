@@ -7,6 +7,8 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using ShieldAI.Core.Configuration;
+using ShieldAI.Core.Detection;
+using ShieldAI.Core.Detection.ThreatScoring;
 using ShieldAI.Core.ML;
 
 // استخدام Types من Models مع alias لتجنب التضارب
@@ -27,6 +29,8 @@ namespace ShieldAI.Core.Scanning
         private readonly FileEnumerator _fileEnumerator;
         private readonly DeepAnalyzer _deepAnalyzer;
         private readonly SemaphoreSlim _scanSemaphore;
+        private readonly ScanCache? _scanCache;
+        private readonly ThreatAggregator _aggregator;
         private readonly ConcurrentDictionary<Guid, Models.ScanJob> _activeJobs = new();
         private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _cancellationTokens = new();
         
@@ -43,6 +47,17 @@ namespace ShieldAI.Core.Scanning
             _settings = ConfigManager.Instance.Settings;
             _fileEnumerator = new FileEnumerator(logger);
             _deepAnalyzer = new DeepAnalyzer(virusTotalApiKey);
+
+            // ScanCache
+            if (_settings.EnableScanCache)
+            {
+                _scanCache = new ScanCache(
+                    TimeSpan.FromMinutes(_settings.ScanCacheTtlMinutes),
+                    _settings.ScanCacheMaxEntries);
+            }
+
+            // ThreatAggregator
+            _aggregator = ThreatAggregator.CreateDefault(scanCache: _scanCache);
             
             // عدد الـ Threads للفحص المتوازي
             int maxParallelism = Math.Min(Environment.ProcessorCount, 4);

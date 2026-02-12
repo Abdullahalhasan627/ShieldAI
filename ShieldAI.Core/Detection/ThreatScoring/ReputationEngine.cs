@@ -137,11 +137,13 @@ namespace ShieldAI.Core.Detection.ThreatScoring
                 {
                     score -= 20; // خصم نقاط للناشر الموثوق
                     result.Reasons.Add($"ناشر موثوق: {context.SignerName}");
+                    context.IsUnsignedOrUntrustedPublisher = false;
                 }
                 else if (context.HasValidSignature)
                 {
                     score -= 10;
                     result.Reasons.Add($"موقّع رقمياً بواسطة: {context.SignerName}");
+                    context.IsUnsignedOrUntrustedPublisher = true;
                 }
             }
             else
@@ -150,6 +152,7 @@ namespace ShieldAI.Core.Detection.ThreatScoring
                 {
                     score += 15;
                     result.Reasons.Add("ملف تنفيذي بدون ناشر معروف");
+                    context.IsUnsignedOrUntrustedPublisher = true;
                 }
             }
 
@@ -170,11 +173,17 @@ namespace ShieldAI.Core.Detection.ThreatScoring
                     context.SignerName = x509.SubjectName.Name;
                     context.HasValidSignature = true;
                     result.Reasons.Add($"توقيع رقمي: {x509.Subject}");
+                    if (!string.IsNullOrEmpty(context.SignerName) &&
+                        TrustedPublishers.Contains(context.SignerName))
+                    {
+                        context.IsUnsignedOrUntrustedPublisher = false;
+                    }
                 }
             }
             catch
             {
                 // unsigned or invalid
+                context.IsUnsignedOrUntrustedPublisher = true;
             }
         }
 

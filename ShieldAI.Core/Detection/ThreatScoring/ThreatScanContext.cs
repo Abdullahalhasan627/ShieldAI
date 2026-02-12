@@ -55,6 +55,26 @@ namespace ShieldAI.Core.Detection.ThreatScoring
         public bool HasValidSignature { get; set; }
 
         /// <summary>
+        /// معرف العملية الأصلية (إن وجد)
+        /// </summary>
+        public int? OriginProcessId { get; set; }
+
+        /// <summary>
+        /// مسار العملية الأصلية (إن وجد)
+        /// </summary>
+        public string? OriginProcessPath { get; set; }
+
+        /// <summary>
+        /// مسار العملية الأب (إن وجد)
+        /// </summary>
+        public string? ParentProcessPath { get; set; }
+
+        /// <summary>
+        /// سطر الأوامر للعملية الأصلية
+        /// </summary>
+        public string? CommandLine { get; set; }
+
+        /// <summary>
         /// امتداد الملف
         /// </summary>
         public string Extension => Path.GetExtension(FilePath).ToLowerInvariant();
@@ -85,17 +105,46 @@ namespace ShieldAI.Core.Detection.ThreatScoring
         public DateTime LastSeenTime { get; set; }
 
         /// <summary>
+        /// هل الملف من Temp أو AppData
+        /// </summary>
+        public bool IsFromTempOrAppData { get; set; }
+
+        /// <summary>
+        /// هل الملف في مسارات بدء التشغيل
+        /// </summary>
+        public bool IsStartupLocation { get; set; }
+
+        /// <summary>
+        /// هل الناشر غير موقع أو غير موثوق
+        /// </summary>
+        public bool IsUnsignedOrUntrustedPublisher { get; set; }
+
+        /// <summary>
         /// إنشاء سياق من مسار ملف
         /// </summary>
         public static ThreatScanContext FromFile(string filePath)
         {
             var fileInfo = new FileInfo(filePath);
+            var fullPath = Path.GetFullPath(filePath);
+            var tempPath = Path.GetFullPath(Path.GetTempPath());
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var startup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+            var isFromTempOrAppData = fullPath.StartsWith(tempPath, StringComparison.OrdinalIgnoreCase)
+                                     || (!string.IsNullOrWhiteSpace(appData) &&
+                                         fullPath.StartsWith(Path.GetFullPath(appData), StringComparison.OrdinalIgnoreCase))
+                                     || (!string.IsNullOrWhiteSpace(localAppData) &&
+                                         fullPath.StartsWith(Path.GetFullPath(localAppData), StringComparison.OrdinalIgnoreCase));
+            var isStartupLocation = !string.IsNullOrWhiteSpace(startup)
+                                    && fullPath.StartsWith(Path.GetFullPath(startup), StringComparison.OrdinalIgnoreCase);
             return new ThreatScanContext
             {
                 FilePath = filePath,
                 FileSize = fileInfo.Exists ? fileInfo.Length : 0,
                 CreationTime = fileInfo.Exists ? fileInfo.CreationTime : DateTime.MinValue,
-                LastWriteTime = fileInfo.Exists ? fileInfo.LastWriteTime : DateTime.MinValue
+                LastWriteTime = fileInfo.Exists ? fileInfo.LastWriteTime : DateTime.MinValue,
+                IsFromTempOrAppData = isFromTempOrAppData,
+                IsStartupLocation = isStartupLocation
             };
         }
     }

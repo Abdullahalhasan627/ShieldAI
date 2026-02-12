@@ -122,6 +122,11 @@ namespace ShieldAI.Core.Detection.ThreatScoring
         public List<ThreatScanResult> EngineResults { get; set; } = new();
 
         /// <summary>
+        /// معرف الارتباط للتتبع التشخيصي
+        /// </summary>
+        public string CorrelationId { get; set; } = "";
+
+        /// <summary>
         /// مسار الملف
         /// </summary>
         public string FilePath { get; set; } = "";

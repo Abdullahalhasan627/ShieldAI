@@ -100,60 +100,54 @@ public class QuarantineManager
         }
 
         var quarantineFilePath = Path.Combine(_quarantinePath, quarantineId + ".qar");
-        if (!File.Exists(quarantineFilePath)) return false;
+        if (!File.Exists(quarantineFilePath)) 
+            throw new FileNotFoundException($"ملف الحجر غير موجود: {quarantineFilePath}");
 
-        try
+        // قراءة الملف المشفر
+        var encryptedData = await File.ReadAllBytesAsync(quarantineFilePath);
+
+        // فك التشفير
+        var originalData = Decrypt(encryptedData);
+
+        // تحديد مسار الاستعادة
+        var targetPath = restorePath ?? entry.OriginalPath;
+        
+        // التأكد من وجود المجلد
+        var directory = Path.GetDirectoryName(targetPath);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
-            // قراءة الملف المشفر
-            var encryptedData = await File.ReadAllBytesAsync(quarantineFilePath);
+            Directory.CreateDirectory(directory);
+        }
 
-            // فك التشفير
-            var originalData = Decrypt(encryptedData);
-
-            // تحديد مسار الاستعادة
-            var targetPath = restorePath ?? entry.OriginalPath;
+        // إذا كان الملف موجودًا، نضيف رقم
+        if (File.Exists(targetPath))
+        {
+            var baseName = Path.GetFileNameWithoutExtension(targetPath);
+            var extension = Path.GetExtension(targetPath);
+            var dir = Path.GetDirectoryName(targetPath) ?? "";
+            int counter = 1;
             
-            // التأكد من وجود المجلد
-            var directory = Path.GetDirectoryName(targetPath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            while (File.Exists(targetPath))
             {
-                Directory.CreateDirectory(directory);
+                targetPath = Path.Combine(dir, $"{baseName}_{counter}{extension}");
+                counter++;
             }
-
-            // إذا كان الملف موجودًا، نضيف رقم
-            if (File.Exists(targetPath))
-            {
-                var baseName = Path.GetFileNameWithoutExtension(targetPath);
-                var extension = Path.GetExtension(targetPath);
-                var dir = Path.GetDirectoryName(targetPath) ?? "";
-                int counter = 1;
-                
-                while (File.Exists(targetPath))
-                {
-                    targetPath = Path.Combine(dir, $"{baseName}_{counter}{extension}");
-                    counter++;
-                }
-            }
-
-            // كتابة الملف المستعاد
-            await File.WriteAllBytesAsync(targetPath, originalData);
-
-            // حذف ملف الحجر
-            File.Delete(quarantineFilePath);
-
-            // إزالة من القائمة
-            lock (_lock)
-            {
-                _quarantinedFiles.Remove(quarantineId);
-            }
-
-            SaveMetadata();
-            return true;
         }
-        catch
+
+        // كتابة الملف المستعاد
+        await File.WriteAllBytesAsync(targetPath, originalData);
+
+        // حذف ملف الحجر
+        File.Delete(quarantineFilePath);
+
+        // إزالة من القائمة
+        lock (_lock)
         {
-            return false;
+            _quarantinedFiles.Remove(quarantineId);
         }
+
+        SaveMetadata();
+        return true;
     }
 
     /// <summary>
@@ -301,6 +295,18 @@ public class QuarantineManager
                     var json = File.ReadAllText(_metadataPath);
                     _quarantinedFiles = JsonSerializer.Deserialize<Dictionary<string, QuarantineEntry>>(json) 
                         ?? new Dictionary<string, QuarantineEntry>();
+
+                    // إصلاح البيانات القديمة التي تحتوي على تواريخ فارغة
+                    bool needsSave = false;
+                    foreach (var entry in _quarantinedFiles.Values)
+                    {
+                        if (entry.QuarantineTime == DateTime.MinValue)
+                        {
+                            entry.QuarantineTime = DateTime.Now;
+                            needsSave = true;
+                        }
+                    }
+                    if (needsSave) SaveMetadata();
                 }
             }
             catch
@@ -342,6 +348,6 @@ public class QuarantineEntry
     public string OriginalPath { get; set; } = string.Empty;
     public string OriginalName { get; set; } = string.Empty;
     public long OriginalSize { get; set; }
-    public DateTime QuarantineTime { get; set; }
+    public DateTime QuarantineTime { get; set; } = DateTime.Now;
     public string FileHash { get; set; } = string.Empty;
 }

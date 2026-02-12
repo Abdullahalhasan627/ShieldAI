@@ -228,9 +228,9 @@ namespace ShieldAI.Core.Detection
                 Sha256Hash = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
                 Md5Hash = "44d88612fea8a8f36de82e1278abb02f",
                 MalwareName = "EICAR-Test-File",
-                MalwareFamily = "Test",
+                MalwareFamily = "EICAR",
                 Description = "ملف اختبار قياسي للتحقق من عمل برنامج مكافحة الفيروسات",
-                ThreatLevel = ThreatLevel.Low,
+                ThreatLevel = ThreatLevel.Critical,
                 AddedDate = DateTime.Now
             });
 

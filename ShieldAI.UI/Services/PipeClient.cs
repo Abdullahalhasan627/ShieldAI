@@ -9,6 +9,7 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Collections.Concurrent;
 
 namespace ShieldAI.UI.Services
 {
@@ -16,11 +17,14 @@ namespace ShieldAI.UI.Services
     /// عميل Named Pipes v2 - للتواصل مع خدمة ShieldAI
     /// يعمل حتى لو الخدمة غير شغالة (يعرض رسالة مناسبة)
     /// </summary>
-    public class PipeClient : IDisposable
+    public partial class PipeClient : IDisposable
     {
         private NamedPipeClientStream? _pipe;
         private readonly SemaphoreSlim _sendLock = new(1, 1);
         private string? _sessionToken;
+        private readonly ConcurrentQueue<TaskCompletionSource<PipeClientResponse>> _pendingResponses = new();
+        private CancellationTokenSource? _listenerCts;
+        private Task? _listenerTask;
         private bool _disposed;
 
         public const string PipeName = "ShieldAI_IPC_v2";
@@ -69,6 +73,8 @@ namespace ShieldAI.UI.Services
                     return false;
                 }
 
+                StartListener();
+
                 ConnectionStateChanged?.Invoke(this, true);
                 return true;
             }
@@ -91,6 +97,15 @@ namespace ShieldAI.UI.Services
         /// </summary>
         public void Disconnect()
         {
+            var cts = _listenerCts;
+            _listenerCts = null;
+
+            if (cts != null)
+            {
+                try { cts.Cancel(); } catch { }
+                cts.Dispose();
+            }
+
             if (_pipe != null)
             {
                 try { _pipe.Close(); } catch { }
@@ -118,6 +133,9 @@ namespace ShieldAI.UI.Services
             await _sendLock.WaitAsync(ct);
             try
             {
+                var tcs = new TaskCompletionSource<PipeClientResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _pendingResponses.Enqueue(tcs);
+
                 var request = new PipeClientRequest
                 {
                     Command = command,
@@ -128,15 +146,8 @@ namespace ShieldAI.UI.Services
                 var requestJson = JsonSerializer.Serialize(request, JsonOpts);
                 await SendMessageAsync(requestJson, ct);
 
-                var responseJson = await ReadMessageAsync(ct);
-                if (responseJson == null)
-                {
-                    Disconnect();
-                    return PipeClientResponse.Fail("فشل قراءة الاستجابة من الخدمة");
-                }
-
-                return JsonSerializer.Deserialize<PipeClientResponse>(responseJson, JsonOpts)
-                    ?? PipeClientResponse.Fail("فشل تحليل الاستجابة");
+                var response = await tcs.Task;
+                return response;
             }
             catch (Exception ex)
             {
@@ -235,6 +246,75 @@ namespace ShieldAI.UI.Services
 
         #endregion
 
+        #region Event Listener
+
+        /// <summary>
+        /// حدث استقبال ThreatActionRequired من الخدمة
+        /// </summary>
+        public event EventHandler<ShieldAI.Core.Contracts.ThreatEventDto>? ThreatActionRequired;
+
+        /// <summary>
+        /// حدث استقبال ThreatActionApplied من الخدمة
+        /// </summary>
+        public event EventHandler<ShieldAI.Core.Contracts.ThreatEventDto>? ThreatActionApplied;
+
+        /// <summary>
+        /// حدث استقبال ThreatDetected من الخدمة
+        /// </summary>
+        public event EventHandler<ShieldAI.Core.Contracts.ThreatDetectedEvent>? ThreatDetectedFromService;
+
+        /// <summary>
+        /// معالجة رسالة واردة — تحقق إذا كانت event (server push) أو response
+        /// </summary>
+        public bool TryDispatchEvent(string json)
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("eventType", out var etProp))
+                {
+                    var eventType = etProp.GetString();
+                    var payloadStr = doc.RootElement.TryGetProperty("payload", out var pProp)
+                        ? pProp.GetString() : null;
+
+                    switch (eventType)
+                    {
+                        case ShieldAI.Core.Contracts.Events.ThreatActionRequired:
+                            if (payloadStr != null)
+                            {
+                                var dto = JsonSerializer.Deserialize<ShieldAI.Core.Contracts.ThreatEventDto>(payloadStr, JsonOpts);
+                                if (dto != null) ThreatActionRequired?.Invoke(this, dto);
+                            }
+                            return true;
+
+                        case ShieldAI.Core.Contracts.Events.ThreatActionApplied:
+                            if (payloadStr != null)
+                            {
+                                var dto = JsonSerializer.Deserialize<ShieldAI.Core.Contracts.ThreatEventDto>(payloadStr, JsonOpts);
+                                if (dto != null) ThreatActionApplied?.Invoke(this, dto);
+                            }
+                            return true;
+
+                        case ShieldAI.Core.Contracts.Events.ThreatDetected:
+                            if (payloadStr != null)
+                            {
+                                var evt = JsonSerializer.Deserialize<ShieldAI.Core.Contracts.ThreatDetectedEvent>(payloadStr, JsonOpts);
+                                if (evt != null) ThreatDetectedFromService?.Invoke(this, evt);
+                            }
+                            return true;
+                    }
+                }
+            }
+            catch
+            {
+                // Not an event, ignore
+            }
+
+            return false;
+        }
+
+        #endregion
+
         public void Dispose()
         {
             if (_disposed) return;
@@ -243,6 +323,75 @@ namespace ShieldAI.UI.Services
             _sendLock.Dispose();
         }
     }
+
+    #region Listener
+
+    public partial class PipeClient
+    {
+        private void StartListener()
+        {
+            if (_pipe == null || !_pipe.IsConnected)
+                return;
+
+            if (_listenerTask != null && !_listenerTask.IsCompleted)
+                return;
+
+            _listenerCts = new CancellationTokenSource();
+            _listenerTask = Task.Run(() => ListenLoopAsync(_listenerCts.Token));
+        }
+
+        private async Task ListenLoopAsync(CancellationToken ct)
+        {
+            try
+            {
+                while (!ct.IsCancellationRequested && _pipe != null && _pipe.IsConnected)
+                {
+                    var json = await ReadMessageAsync(ct);
+                    if (json == null)
+                        break;
+
+                    if (TryDispatchEvent(json))
+                        continue;
+
+                    PipeClientResponse? response = null;
+                    try
+                    {
+                        response = JsonSerializer.Deserialize<PipeClientResponse>(json, JsonOpts);
+                    }
+                    catch
+                    {
+                        // Ignore invalid response shapes
+                    }
+
+                    if (response == null)
+                        continue;
+
+                    if (_pendingResponses.TryDequeue(out var tcs))
+                    {
+                        tcs.TrySetResult(response);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected on disconnect
+            }
+            catch (Exception ex)
+            {
+                ErrorOccurred?.Invoke(this, $"خطأ في قناة الأحداث: {ex.Message}");
+            }
+            finally
+            {
+                // Fail any pending requests
+                while (_pendingResponses.TryDequeue(out var tcs))
+                {
+                    tcs.TrySetResult(PipeClientResponse.Fail("انقطع الاتصال بالخدمة"));
+                }
+            }
+        }
+    }
+
+    #endregion
 
     #region DTOs
 

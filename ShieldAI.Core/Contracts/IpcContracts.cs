@@ -138,6 +138,10 @@ namespace ShieldAI.Core.Contracts
         // السجلات
         public const string GetLogs = "get_logs";
         public const string ClearLogs = "clear_logs";
+
+        // قرارات التهديد
+        public const string ResolveThreatAction = "resolve_threat_action";
+        public const string GetPendingThreats = "get_pending_threats";
     }
 
     #endregion
@@ -226,6 +230,8 @@ namespace ShieldAI.Core.Contracts
         public const string ScanCompleted = "event_scan_completed";
         public const string RealTimeAlert = "event_realtime_alert";
         public const string LogEntry = "event_log_entry";
+        public const string ThreatActionRequired = "event_threat_action_required";
+        public const string ThreatActionApplied = "event_threat_action_applied";
     }
 
     public class EventEnvelope
@@ -262,6 +268,72 @@ namespace ShieldAI.Core.Contracts
         public string Verdict { get; set; } = "";
         public double RiskScore { get; set; }
         public bool AutoQuarantined { get; set; }
+    }
+
+    /// <summary>
+    /// DTO شامل لحدث تهديد — يُرسل عبر IPC للواجهة
+    /// </summary>
+    public class ThreatEventDto
+    {
+        public string EventId { get; set; } = Guid.NewGuid().ToString("N")[..12];
+        public DateTime TimestampUtc { get; set; } = DateTime.UtcNow;
+        public string FilePath { get; set; } = "";
+        public string FileName { get; set; } = "";
+        public string? Sha256 { get; set; }
+        public int AggregatedScore { get; set; }
+        public string Verdict { get; set; } = "";
+        public string RecommendedAction { get; set; } = "";
+        public List<ThreatEngineBreakdown> EngineBreakdown { get; set; } = new();
+        public List<string> Reasons { get; set; } = new();
+        public string? QuarantineId { get; set; }
+        public bool ActionTaken { get; set; }
+        public string? ActionResult { get; set; }
+    }
+
+    public class ThreatEngineBreakdown
+    {
+        public string Engine { get; set; } = "";
+        public int Score { get; set; }
+        public string Verdict { get; set; } = "";
+    }
+
+    /// <summary>
+    /// الإجراءات المتاحة للتهديد
+    /// </summary>
+    public enum ThreatAction
+    {
+        Quarantine,
+        Delete,
+        Allow
+    }
+
+    /// <summary>
+    /// طلب حل تهديد من الواجهة
+    /// </summary>
+    public class ResolveThreatRequest
+    {
+        public string EventId { get; set; } = "";
+        public ThreatAction Action { get; set; }
+        public bool AddToExclusions { get; set; }
+    }
+
+    /// <summary>
+    /// استجابة حل تهديد
+    /// </summary>
+    public class ResolveThreatResponse
+    {
+        public bool Success { get; set; }
+        public string EventId { get; set; } = "";
+        public string ActionApplied { get; set; } = "";
+        public string? Error { get; set; }
+    }
+
+    /// <summary>
+    /// قائمة التهديدات المعلّقة
+    /// </summary>
+    public class PendingThreatsResponse
+    {
+        public List<ThreatEventDto> PendingThreats { get; set; } = new();
     }
 
     public class LogEntryEvent

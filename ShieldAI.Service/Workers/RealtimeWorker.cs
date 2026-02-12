@@ -7,8 +7,10 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ShieldAI.Core.Configuration;
+using ShieldAI.Core.Contracts;
 using ShieldAI.Core.Detection;
 using ShieldAI.Core.Detection.ThreatScoring;
+using ShieldAI.Core.Logging;
 using ShieldAI.Core.Monitoring.Pipeline;
 using ShieldAI.Core.Monitoring.Quarantine;
 using ShieldAI.Core.Scanning;
@@ -20,8 +22,9 @@ namespace ShieldAI.Service.Workers
     /// </summary>
     public class RealtimeWorker : IDisposable
     {
-        private readonly ILogger _logger;
+        private readonly Microsoft.Extensions.Logging.ILogger _logger;
         private readonly AppSettings _settings;
+        private readonly SignatureDatabase _signatureDb;
 
         private readonly FileEventQueue _eventQueue;
         private readonly EventCoalescer _coalescer;
@@ -29,6 +32,9 @@ namespace ShieldAI.Service.Workers
         private readonly ThreatAggregator _aggregator;
         private readonly QuarantineStore _quarantineStore;
         private readonly ScanCache _scanCache;
+        private readonly HeuristicEngine _heuristicEngine = new();
+        private readonly AmsiEngine _amsiEngine = new();
+        private readonly ThreatActionExecutor _actionExecutor;
 
         private readonly List<FileSystemWatcher> _watchers = new();
         private readonly HashSet<string> _excludedExtensions;
@@ -40,17 +46,23 @@ namespace ShieldAI.Service.Workers
         // الأحداث
         public event EventHandler<AggregatedThreatResult>? ThreatDetected;
 
+        /// <summary>
+        /// منفّذ إجراءات التهديد — للاشتراك في أحداثه من الخارج
+        /// </summary>
+        public ThreatActionExecutor ActionExecutor => _actionExecutor;
+
         public bool IsRunning => _isRunning;
         public int PendingCount => _eventQueue.PendingCount + _coalescer.PendingCount;
 
         public RealtimeWorker(
-            ILogger logger,
+            Microsoft.Extensions.Logging.ILogger logger,
             QuarantineStore quarantineStore,
             SignatureDatabase? signatureDb = null)
         {
             _logger = logger;
             _settings = ConfigManager.Instance.Settings;
             _quarantineStore = quarantineStore;
+            _signatureDb = signatureDb ?? new SignatureDatabase();
 
             // إنشاء الأوزان من الإعدادات
             var weights = new EngineWeights
@@ -62,7 +74,9 @@ namespace ShieldAI.Service.Workers
                 AmsiEngine = _settings.AmsiEngineWeight
             };
 
-            _scanCache = new ScanCache(TimeSpan.FromMinutes(_settings.ScanCacheTtlMinutes));
+            _scanCache = new ScanCache(
+                TimeSpan.FromMinutes(_settings.ScanCacheTtlMinutes),
+                _settings.ScanCacheMaxEntries);
             _aggregator = ThreatAggregator.CreateDefault(signatureDb, weights, _scanCache);
             _aggregator.BlockThreshold = _settings.BlockThreshold;
             _aggregator.QuarantineThreshold = _settings.QuarantineThreshold;
@@ -72,6 +86,9 @@ namespace ShieldAI.Service.Workers
             _eventQueue = new FileEventQueue(_settings.PipelineQueueCapacity);
             _coalescer = new EventCoalescer(_eventQueue, _settings.EventCoalesceMs);
             _scanWorker = new PipelineScanWorker(_eventQueue, _aggregator, logger);
+
+            // منفّذ الإجراءات
+            _actionExecutor = new ThreatActionExecutor(_quarantineStore, _settings, logger);
 
             // ربط أحداث الفحص
             _scanWorker.ThreatDetected += OnThreatDetected;
@@ -162,16 +179,12 @@ namespace ShieldAI.Service.Workers
 
         private void OnFileEvent(object sender, FileSystemEventArgs e)
         {
-            if (!ShouldProcess(e.FullPath)) return;
-            UpdatePressureMode();
-            _coalescer.Add(e.FullPath, e.ChangeType);
+            _ = HandleFileEventAsync(e.FullPath, e.ChangeType);
         }
 
         private void OnFileRenamed(object sender, RenamedEventArgs e)
         {
-            if (!ShouldProcess(e.FullPath)) return;
-            UpdatePressureMode();
-            _coalescer.Add(e.FullPath, WatcherChangeTypes.Renamed);
+            _ = HandleFileEventAsync(e.FullPath, WatcherChangeTypes.Renamed);
         }
 
         private void OnWatcherError(object sender, ErrorEventArgs e)
@@ -183,22 +196,116 @@ namespace ShieldAI.Service.Workers
         {
             ThreatDetected?.Invoke(this, result);
 
-            // الحجر التلقائي
-            if (_settings.AutoQuarantine &&
-                (result.Verdict == AggregatedVerdict.Block || result.Verdict == AggregatedVerdict.Quarantine))
+            // تنفيذ الإجراء عبر ThreatActionExecutor بناءً على السياسة
+            if (result.Verdict == AggregatedVerdict.Allow)
+                return;
+
+            try
             {
-                try
+                var context = _aggregator.BuildContext(result.FilePath);
+                var dto = await _actionExecutor.ApplyActionAsync(result, context);
+
+                if (dto.ActionTaken && dto.ActionResult?.Contains("Quarantine") == true)
                 {
-                    var entry = await _quarantineStore.QuarantineFileAsync(result.FilePath, result);
-                    if (entry != null)
-                    {
-                        _scanWorker.AddQuarantinedPath(result.FilePath);
-                        _logger.LogInformation("تم حجر: {File}", result.FilePath);
-                    }
+                    _scanWorker.AddQuarantinedPath(result.FilePath);
                 }
-                catch (Exception ex)
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "فشل تنفيذ إجراء التهديد: {File}", result.FilePath);
+            }
+        }
+
+        private async Task HandleFileEventAsync(string filePath, WatcherChangeTypes changeType)
+        {
+            if (!ShouldProcess(filePath)) return;
+
+            UpdatePressureMode();
+
+            try
+            {
+                var quickGateScore = await GetQuickGateScoreAsync(filePath).ConfigureAwait(false);
+                if (quickGateScore >= _settings.QuickGateSuspiciousScore)
                 {
-                    _logger.LogError(ex, "فشل حجر: {File}", result.FilePath);
+                    await TryAtomicQuarantineAsync(filePath, quickGateScore).ConfigureAwait(false);
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "فشل Quick Gate: {File}", filePath);
+            }
+
+            _coalescer.Add(filePath, changeType);
+        }
+
+        private async Task<int> GetQuickGateScoreAsync(string filePath)
+        {
+            if (!File.Exists(filePath))
+                return 0;
+
+            var context = _aggregator.BuildContext(filePath);
+            var engines = new IThreatEngine[]
+            {
+                new SignatureEngine(_signatureDb),
+                _heuristicEngine,
+                _amsiEngine
+            };
+
+            var tasks = engines
+                .Where(e => e.IsReady)
+                .Select(engine => engine.ScanAsync(context));
+
+            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+            return _aggregator.CalculateWeightedScore(results);
+        }
+
+        private async Task TryAtomicQuarantineAsync(string filePath, int quickGateScore)
+        {
+            if (!_settings.AutoQuarantine || !File.Exists(filePath))
+                return;
+
+            var correlationId = ScanDiagnosticLog.NewCorrelationId();
+            ScanDiagnosticLog.LogQuickGate(_logger, correlationId, filePath, quickGateScore, true);
+
+            var (success, movedPath) = await _quarantineStore.TryAtomicMoveToQuarantineAsync(
+                filePath,
+                _settings.AtomicMoveMaxRetries,
+                _settings.AtomicMoveInitialDelayMs,
+                _settings.AtomicMoveMaxDelayMs).ConfigureAwait(false);
+
+            if (!success || string.IsNullOrWhiteSpace(movedPath))
+            {
+                _logger.LogWarning("[Scan:{CorrelationId}] AtomicMove FAILED for {File}",
+                    correlationId, filePath);
+                return;
+            }
+
+            _scanWorker.AddQuarantinedPath(movedPath);
+
+            var context = _aggregator.BuildContext(movedPath);
+            var result = await _aggregator.ScanAsync(context).ConfigureAwait(false);
+            result.FilePath = filePath;
+
+            if (result.Reasons.All(r => !r.Contains("Quick Gate", StringComparison.OrdinalIgnoreCase)))
+            {
+                result.Reasons.Add($"Quick Gate: Score {quickGateScore}");
+            }
+
+            if (_settings.AutoQuarantine)
+            {
+                var entry = await _quarantineStore.QuarantineMovedFileAsync(movedPath, filePath, result)
+                    .ConfigureAwait(false);
+
+                ScanDiagnosticLog.LogScanResult(
+                    _logger, correlationId, context, result,
+                    policyDecision: $"QuickGate={quickGateScore}",
+                    quarantineAttempted: true,
+                    quarantineSuccess: entry != null);
+
+                if (entry != null)
+                {
+                    ThreatDetected?.Invoke(this, result);
                 }
             }
         }
