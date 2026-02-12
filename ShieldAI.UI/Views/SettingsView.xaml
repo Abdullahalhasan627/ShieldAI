@@ -41,7 +41,64 @@
                         <TextBlock Text="التحديثات" Style="{StaticResource SubHeaderStyle}"/>
                     </StackPanel>
 
-                    <Grid Margin="0,0,0,16">
+                    <!-- الإصدار الحالي -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <TextBlock Text="الإصدار الحالي:" Foreground="{StaticResource TextSecondaryBrush}" Width="120"/>
+                        <TextBlock Text="1.0.0" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                    </StackPanel>
+
+                    <!-- حالة التحديث -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="حالة التحديث:" Foreground="{StaticResource TextSecondaryBrush}" Width="120"/>
+                        <TextBlock Text="{Binding UpdateStatus}" 
+                                   Foreground="{StaticResource TextPrimaryBrush}" 
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
+
+                    <!-- شريط التقدم -->
+                    <ProgressBar Value="{Binding UpdateProgress}" 
+                                 Maximum="1"
+                                 Height="6"
+                                 Margin="0,0,0,16"
+                                 Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVisibility}}"/>
+
+                    <!-- إشعار التحديث الجديد -->
+                    <Border Background="#1A4CAF50" 
+                            CornerRadius="8" 
+                            Padding="16" 
+                            Margin="0,0,0,16"
+                            Visibility="{Binding IsGitHubUpdateAvailable, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="🎉" FontSize="20" Margin="0,0,10,0"/>
+                                <TextBlock Text="تحديث جديد متاح!" 
+                                           Foreground="#4CAF50" 
+                                           FontWeight="Bold"
+                                           FontSize="16"/>
+                            </StackPanel>
+                            
+                            <TextBlock Text="{Binding LatestVersion, StringFormat='الإصدار الجديد: {0}'}" 
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       Margin="0,0,0,4"/>
+                            
+                            <TextBlock Text="{Binding ReleaseNotes}" 
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       MaxHeight="100"
+                                       Margin="0,0,0,12"/>
+                            
+                            <Button Content="تحميل وتحديث الآن"
+                                    Command="{Binding DownloadUpdateCommand}"
+                                    Background="#4CAF50"
+                                    Foreground="White"
+                                    Padding="20,10"
+                                    HorizontalAlignment="Left"
+                                    IsEnabled="{Binding IsUpdating, Converter={StaticResource InverseBoolToVisibility}}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- التحديث التلقائي -->
+                    <Grid Margin="0,8,0,16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -57,15 +114,20 @@
                                       IsChecked="{Binding AutoUpdateEnabled, Mode=TwoWay}"/>
                     </Grid>
 
+                    <!-- أزرار التحديث -->
                     <StackPanel Orientation="Horizontal">
+                        <Button Content="التحقق من التحديثات"
+                                Command="{Binding CheckUpdatesCommand}"
+                                Style="{StaticResource ModernButtonStyle}"
+                                Padding="16,8"
+                                Margin="0,0,10,0"
+                                IsEnabled="{Binding IsUpdating, Converter={StaticResource InverseBoolToVisibility}}"/>
+                        
                         <Button Content="تحديث الآن"
                                 Command="{Binding UpdateNowCommand}"
                                 Style="{StaticResource ModernButtonStyle}"
-                                Padding="16,8"/>
-                        <TextBlock Text="{Binding UpdateStatus}"
-                                   Style="{StaticResource BodyStyle}"
-                                   Margin="12,0,0,0"
-                                   VerticalAlignment="Center"/>
+                                Padding="16,8"
+                                IsEnabled="{Binding IsUpdating, Converter={StaticResource InverseBoolToVisibility}}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -110,128 +172,6 @@
                             <TextBlock Text=".msi" Foreground="{StaticResource TextPrimaryBrush}"/>
                         </Border>
                     </WrapPanel>
-                </StackPanel>
-            </Border>
-            
-            <!-- إعدادات VirusTotal -->
-            <Border Style="{StaticResource CardStyle}">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                        <TextBlock Text="🌐" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <TextBlock Text="VirusTotal Integration" Style="{StaticResource SubHeaderStyle}"/>
-                    </StackPanel>
-                    
-                    <TextBlock Text="اربط حسابك في VirusTotal للفحص عبر 70+ محرك antivirus" 
-                               Style="{StaticResource BodyStyle}" Margin="0,0,0,16"/>
-                    
-                    <TextBlock Text="API Key:" 
-                               Foreground="{StaticResource TextPrimaryBrush}" 
-                               FontWeight="SemiBold" Margin="0,0,0,8"/>
-                    
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <TextBox x:Name="ApiKeyTextBox"
-                                 Text="{Binding VirusTotalApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 Background="{StaticResource BackgroundHoverBrush}"
-                                 Foreground="{StaticResource TextPrimaryBrush}"
-                                 BorderBrush="{StaticResource BorderBrush}"
-                                 Padding="12,10"
-                                 FontFamily="Consolas"
-                                 FontSize="13"/>
-                        
-                        <Button Grid.Column="1" 
-                                Content="اختبار الاتصال"
-                                Command="{Binding TestApiKeyCommand}"
-                                Background="{StaticResource PrimaryBrush}"
-                                Foreground="White"
-                                Padding="16,10"
-                                Margin="10,0,0,0"
-                                Cursor="Hand"/>
-                    </Grid>
-                    
-                    <StackPanel Orientation="Horizontal" 
-                                Visibility="{Binding ApiKeyStatus, Converter={StaticResource StringToVisibility}}">
-                        <TextBlock Text="{Binding ApiKeyStatusIcon}" FontSize="16" Margin="0,0,8,0"/>
-                        <TextBlock Text="{Binding ApiKeyStatus}" 
-                                   Foreground="{Binding ApiKeyStatusColor}"/>
-                    </StackPanel>
-                    
-                    <Grid Margin="0,16,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="استخدام VirusTotal في AI Scan" 
-                                       Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                            <TextBlock Text="فحص الملفات عبر VirusTotal أثناء التحليل العميق" 
-                                       Style="{StaticResource BodyStyle}"/>
-                        </StackPanel>
-                        
-                        <ToggleButton Grid.Column="1" 
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      IsChecked="{Binding UseVirusTotalInAIScan, Mode=TwoWay}"/>
-                    </Grid>
-                    
-                    <Border Background="#1A667eea" CornerRadius="8" Padding="12" Margin="0,16,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="💡" FontSize="16" Margin="0,0,10,0"/>
-                            <TextBlock Text="احصل على API Key مجاني من virustotal.com" 
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Border>
-            
-            <!-- إعدادات AI Scan -->
-            <Border Style="{StaticResource CardStyle}">
-                <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                        <TextBlock Text="🤖" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <TextBlock Text="AI Scan Settings" Style="{StaticResource SubHeaderStyle}"/>
-                    </StackPanel>
-                    
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="التحليل العميق" 
-                                       Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                            <TextBlock Text="استخدام جميع محركات الكشف للتحليل الشامل" 
-                                       Style="{StaticResource BodyStyle}"/>
-                        </StackPanel>
-                        
-                        <ToggleButton Grid.Column="1" 
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      IsChecked="{Binding EnableDeepAnalysis, Mode=TwoWay}"/>
-                    </Grid>
-                    
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="استخدام ML.NET" 
-                                       Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                            <TextBlock Text="تصنيف الملفات باستخدام الذكاء الاصطناعي" 
-                                       Style="{StaticResource BodyStyle}"/>
-                        </StackPanel>
-                        
-                        <ToggleButton Grid.Column="1" 
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      IsChecked="{Binding UseMLDetection, Mode=TwoWay}"/>
-                    </Grid>
                 </StackPanel>
             </Border>
             

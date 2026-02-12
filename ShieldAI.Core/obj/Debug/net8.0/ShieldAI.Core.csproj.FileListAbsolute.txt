@@ -50,3 +50,16 @@ C:\Users\Administrator\Desktop\antigravity\antigravity1 - Copy\scratch\ShieldAI\
 C:\Users\Administrator\Desktop\antigravity\antigravity1 - Copy\scratch\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\refint\ShieldAI.Core.dll
 C:\Users\Administrator\Desktop\antigravity\antigravity1 - Copy\scratch\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ShieldAI.Core.pdb
 C:\Users\Administrator\Desktop\antigravity\antigravity1 - Copy\scratch\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ref\ShieldAI.Core.dll
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\bin\Debug\net8.0\ShieldAI.Core.deps.json
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\bin\Debug\net8.0\ShieldAI.Core.dll
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\bin\Debug\net8.0\ShieldAI.Core.pdb
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ShieldAI.Core.csproj.AssemblyReference.cache
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ShieldAI.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ShieldAI.Core.AssemblyInfoInputs.cache
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ShieldAI.Core.AssemblyInfo.cs
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ShieldAI.Core.csproj.CoreCompileInputs.cache
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ShieldAI.Core.sourcelink.json
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ShieldAI.Core.dll
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\refint\ShieldAI.Core.dll
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ShieldAI.Core.pdb
+C:\Users\Administrator\Desktop\ShieldAI\ShieldAI.Core\obj\Debug\net8.0\ref\ShieldAI.Core.dll

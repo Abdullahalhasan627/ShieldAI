@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "J8StCRtey3s=",
+  "dgSpecHash": "dOCm2z81uUM=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj",
+  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Administrator\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\8.0.0\\microsoft.extensions.dependencyinjection.abstractions.8.0.0.nupkg.sha512",
     "C:\\Users\\Administrator\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\8.0.0\\microsoft.extensions.logging.abstractions.8.0.0.nupkg.sha512",

@@ -52,7 +52,7 @@ namespace ShieldAI.UI.Views {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/ShieldAI.UI;component/views/scanview.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/ShieldAI;component/views/scanview.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\Views\ScanView.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

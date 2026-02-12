@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Tests\\ShieldAI.Tests.csproj": {}
+    "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Tests\\ShieldAI.Tests.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj": {
+    "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj",
+        "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj",
         "projectName": "ShieldAI.Core",
-        "projectPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj",
+        "projectPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj",
         "packagesPath": "C:\\Users\\Administrator\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\obj\\",
+        "outputPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -95,14 +95,14 @@
         }
       }
     },
-    "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj": {
+    "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj",
+        "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj",
         "projectName": "ShieldAI.Service",
-        "projectPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj",
+        "projectPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj",
         "packagesPath": "C:\\Users\\Administrator\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Service\\obj\\",
+        "outputPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Service\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -123,8 +123,8 @@
           "net8.0-windows7.0": {
             "targetAlias": "net8.0-windows",
             "projectReferences": {
-              "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj": {
-                "projectPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj"
+              "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj": {
+                "projectPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj"
               }
             }
           }
@@ -174,14 +174,14 @@
         }
       }
     },
-    "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Tests\\ShieldAI.Tests.csproj": {
+    "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Tests\\ShieldAI.Tests.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Tests\\ShieldAI.Tests.csproj",
+        "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Tests\\ShieldAI.Tests.csproj",
         "projectName": "ShieldAI.Tests",
-        "projectPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Tests\\ShieldAI.Tests.csproj",
+        "projectPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Tests\\ShieldAI.Tests.csproj",
         "packagesPath": "C:\\Users\\Administrator\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Tests\\obj\\",
+        "outputPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Tests\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -202,14 +202,14 @@
           "net8.0-windows7.0": {
             "targetAlias": "net8.0-windows7.0",
             "projectReferences": {
-              "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj": {
-                "projectPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj"
+              "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj": {
+                "projectPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj"
               },
-              "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj": {
-                "projectPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj"
+              "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj": {
+                "projectPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj"
               },
-              "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj": {
-                "projectPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj"
+              "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj": {
+                "projectPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj"
               }
             }
           }
@@ -267,14 +267,14 @@
         }
       }
     },
-    "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj": {
+    "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj",
-        "projectName": "ShieldAI.UI",
-        "projectPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj",
+        "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj",
+        "projectName": "ShieldAI",
+        "projectPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.UI\\ShieldAI.UI.csproj",
         "packagesPath": "C:\\Users\\Administrator\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.UI\\obj\\",
+        "outputPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.UI\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -295,8 +295,8 @@
           "net8.0-windows7.0": {
             "targetAlias": "net8.0-windows",
             "projectReferences": {
-              "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj": {
-                "projectPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj"
+              "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj": {
+                "projectPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj"
               }
             }
           }

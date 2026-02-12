@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "CUNEAjGeckM=",
+  "dgSpecHash": "ElXBdDOZxNo=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj",
+  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Service\\ShieldAI.Service.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Administrator\\.nuget\\packages\\microsoft.extensions.configuration\\8.0.0\\microsoft.extensions.configuration.8.0.0.nupkg.sha512",
     "C:\\Users\\Administrator\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\8.0.0\\microsoft.extensions.configuration.abstractions.8.0.0.nupkg.sha512",

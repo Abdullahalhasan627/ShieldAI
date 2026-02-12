@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "IVnuSUbRwJI=",
+  "dgSpecHash": "POXFVe+RqZM=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Tests\\ShieldAI.Tests.csproj",
+  "projectFilePath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Tests\\ShieldAI.Tests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Administrator\\.nuget\\packages\\communitytoolkit.mvvm\\8.2.2\\communitytoolkit.mvvm.8.2.2.nupkg.sha512",
     "C:\\Users\\Administrator\\.nuget\\packages\\coverlet.collector\\6.0.0\\coverlet.collector.6.0.0.nupkg.sha512",

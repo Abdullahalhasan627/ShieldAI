@@ -87,7 +87,7 @@ namespace ShieldAI.Tests
             var instance1 = ConfigManager.Instance;
             var instance2 = ConfigManager.Instance;
             
-            // Assert
+            // Assert 
             Assert.Same(instance1, instance2);
         }
 

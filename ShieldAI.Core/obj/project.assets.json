@@ -1631,11 +1631,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj",
+      "projectUniqueName": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj",
       "projectName": "ShieldAI.Core",
-      "projectPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj",
+      "projectPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\ShieldAI.Core.csproj",
       "packagesPath": "C:\\Users\\Administrator\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Administrator\\Desktop\\antigravity\\antigravity1 - Copy\\scratch\\ShieldAI\\ShieldAI.Core\\obj\\",
+      "outputPath": "C:\\Users\\Administrator\\Desktop\\ShieldAI\\ShieldAI.Core\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
