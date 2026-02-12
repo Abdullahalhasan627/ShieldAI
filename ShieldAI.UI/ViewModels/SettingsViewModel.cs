@@ -245,14 +245,34 @@ namespace ShieldAI.UI.ViewModels
             }
         }
 
-        private void ExecuteCheckUpdates()
+        private async void ExecuteCheckUpdates()
         {
-            _ = CheckGitHubUpdatesAsync();
+            Debug.WriteLine("ExecuteCheckUpdates clicked");
+            try
+            {
+                await CheckGitHubUpdatesAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error in ExecuteCheckUpdates: {ex}");
+                UpdateStatus = "فشل التحقق من التحديثات";
+                _dialogService.ShowError($"خطأ: {ex.Message}", "خطأ");
+            }
         }
 
-        private void ExecuteUpdateNow()
+        private async void ExecuteUpdateNow()
         {
-            _ = CheckUpdatesAsync(applyUpdates: true);
+            Debug.WriteLine("ExecuteUpdateNow clicked");
+            try
+            {
+                await CheckUpdatesAsync(applyUpdates: true);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error in ExecuteUpdateNow: {ex}");
+                UpdateStatus = "فشل التحديث";
+                _dialogService.ShowError($"خطأ: {ex.Message}", "خطأ");
+            }
         }
 
         /// <summary>
@@ -260,36 +280,60 @@ namespace ShieldAI.UI.ViewModels
         /// </summary>
         private async void ExecuteDownloadUpdate()
         {
-            if (IsUpdating) return;
-
-            var result = await _gitHubUpdateService.CheckForUpdateAsync();
-            if (!result.HasUpdate || string.IsNullOrEmpty(result.DownloadUrl))
+            Debug.WriteLine("ExecuteDownloadUpdate started");
+            
+            if (IsUpdating) 
             {
-                _dialogService.ShowInfo("لا توجد تحديثات متاحة", "تحديث");
+                Debug.WriteLine("Already updating, returning");
                 return;
             }
 
-            // تأكيد التحديث
-            var confirm = _dialogService.ShowConfirm(
-                $"سيتم تحديث ShieldAI من {result.CurrentVersion} إلى {result.LatestVersion}\n\n" +
-                "سيتم إغلاق التطبيق وإعادة تشغيله تلقائياً.\n\n" +
-                "هل تريد المتابعة؟",
-                "تأكيد التحديث");
-
-            if (!confirm) return;
-
-            IsUpdating = true;
-            UpdateStatus = "جاري تحميل التحديث...";
-
             try
             {
+                UpdateStatus = "جاري التحقق من التحديث...";
+                var result = await _gitHubUpdateService.CheckForUpdateAsync();
+                
+                Debug.WriteLine($"CheckForUpdateAsync result: HasUpdate={result.HasUpdate}, DownloadUrl={result.DownloadUrl ?? "null"}");
+
+                if (!result.HasUpdate)
+                {
+                    _dialogService.ShowInfo("لا توجد تحديثات متاحة", "تحديث");
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(result.DownloadUrl))
+                {
+                    _dialogService.ShowError(
+                        "تم العثور على تحديث ولكن لا يوجد ملف قابل للتحميل في GitHub Release.\n\n" +
+                        "تأكد من إرفاق ملف (.zip أو .exe) في Release.", 
+                        "خطأ في التحديث");
+                    UpdateStatus = "لا يوجد ملف تحديث";
+                    return;
+                }
+
+                // تأكيد التحديث
+                var confirm = _dialogService.ShowConfirm(
+                    $"سيتم تحديث ShieldAI من {result.CurrentVersion} إلى {result.LatestVersion}\n\n" +
+                    "سيتم إغلاق التطبيق وإعادة تشغيله تلقائياً.\n\n" +
+                    "هل تريد المتابعة؟",
+                    "تأكيد التحديث");
+
+                Debug.WriteLine($"User confirmation: {confirm}");
+                
+                if (!confirm) return;
+
+                IsUpdating = true;
+                UpdateStatus = "جاري تحميل التحديث...";
+
                 var progress = new Progress<double>(p =>
                 {
                     UpdateProgress = p;
                     UpdateStatus = $"جاري التحميل... {p:P0}";
                 });
 
+                Debug.WriteLine("Starting DownloadAndApplyUpdateAsync...");
                 var success = await _gitHubUpdateService.DownloadAndApplyUpdateAsync(result.DownloadUrl, progress);
+                Debug.WriteLine($"DownloadAndApplyUpdateAsync result: {success}");
 
                 if (success)
                 {
@@ -315,7 +359,8 @@ namespace ShieldAI.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _dialogService.ShowError($"خطأ أثناء التحديث: {ex.Message}", "خطأ");
+                Debug.WriteLine($"Exception in ExecuteDownloadUpdate: {ex}");
+                _dialogService.ShowError($"خطأ أثناء التحديث:\n{ex.Message}", "خطأ");
                 UpdateStatus = "فشل التحديث ❌";
             }
             finally

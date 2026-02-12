@@ -126,10 +126,15 @@ namespace ShieldAI.UI.Services
                 // مقارنة الإصدارات
                 var hasUpdate = IsNewerVersion(release.TagName, _currentVersion);
                 
-                // البحث عن ملف التحديث (ShieldAI.zip أو ShieldAI.exe)
+                // البحث عن ملف التحديث (أي ملف مرفق في Release)
+                // نفضل ملفات .zip ثم .exe ثم أي ملف آخر
                 var asset = release.Assets?.FirstOrDefault(a => 
-                    a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
-                    a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+                    a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) 
+                    ?? release.Assets?.FirstOrDefault(a => 
+                    a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    ?? release.Assets?.FirstOrDefault();
+
+                Debug.WriteLine($"GitHub Release found: {release.TagName}, Asset: {asset?.Name ?? "None"}, URL: {asset?.BrowserDownloadUrl ?? "None"}");
 
                 return new UpdateCheckResult
                 {
