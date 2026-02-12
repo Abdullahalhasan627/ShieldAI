@@ -5,12 +5,13 @@ using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ShieldAI.Core.Configuration;
+using ShieldAI.Core.Contracts;
 using ShieldAI.Core.Detection;
 using ShieldAI.Core.Models;
 using ShieldAI.Core.Monitoring;
+using ShieldAI.Core.Monitoring.Quarantine;
 using ShieldAI.Core.Scanning;
-using QuarantineManager = ShieldAI.Core.Monitoring.QuarantineManager;
-using QuarantineEntry = ShieldAI.Core.Monitoring.QuarantineEntry;
+using ShieldAI.UI.Services;
 
 namespace ShieldAI.UI.ViewModels;
 
@@ -22,24 +23,33 @@ public partial class MainViewModel : ObservableObject
     private readonly FileScanner _fileScanner;
     private readonly ProcessScanner _processScanner;
     private readonly RealTimeMonitor _realTimeMonitor;
-    private readonly QuarantineManager _quarantineManager;
+    private readonly QuarantineStore _quarantineStore;
     private readonly SignatureDatabase _signatureDb;
+    private readonly PipeClient _pipeClient;
+    private readonly IDialogService _dialogService;
     private CancellationTokenSource? _scanCts;
     private readonly HashSet<string> _scannedHashes = new();
 
     public MainViewModel()
     {
         _signatureDb = new SignatureDatabase();
-        _quarantineManager = new QuarantineManager();
+        _quarantineStore = new QuarantineStore();
         _fileScanner = new FileScanner(_signatureDb);
         _processScanner = new ProcessScanner();
         _realTimeMonitor = new RealTimeMonitor();
+        _pipeClient = new PipeClient();
+        _dialogService = new DialogService();
 
         // الاشتراك في أحداث المراقبة
         _realTimeMonitor.ThreatFound += OnThreatFound;
         _realTimeMonitor.FileDetected += OnFileDetected;
         _fileScanner.FileScanCompleted += OnFileScanCompleted;
         _fileScanner.ScanProgress += OnScanProgress;
+
+        // الاشتراك في أحداث التهديد عبر IPC
+        _pipeClient.ThreatActionRequired += OnThreatActionRequired;
+        _pipeClient.ThreatActionApplied += OnThreatActionApplied;
+        _pipeClient.ThreatDetectedFromService += OnThreatDetectedFromService;
 
         // تحميل البيانات الأولية
         LoadQuarantinedFiles();
@@ -128,7 +138,7 @@ public partial class MainViewModel : ObservableObject
     private ObservableCollection<ProcessInfo> _processes = new();
 
     [ObservableProperty]
-    private ObservableCollection<QuarantineEntry> _quarantinedFiles = new();
+    private ObservableCollection<QuarantineItemMetadata> _quarantinedFiles = new();
 
     [ObservableProperty]
     private ObservableCollection<ThreatDetectedEventArgs> _recentThreats = new();
@@ -180,6 +190,13 @@ public partial class MainViewModel : ObservableObject
     {
         // الانتقال إلى صفحة الفحص لعرض نتائج الفحص
         SelectedViewIndex = 1; // Navigate to ScanView
+    }
+
+    [RelayCommand]
+    private void ViewQuarantine()
+    {
+        // الانتقال إلى صفحة الحجر الصحي
+        SelectedViewIndex = 3; // Navigate to QuarantineView
     }
 
     [RelayCommand]
@@ -278,7 +295,7 @@ public partial class MainViewModel : ObservableObject
             // Auto-quarantine infected and suspicious files
             try
             {
-                await _quarantineManager.QuarantineFileAsync(result.FilePath);
+                await _quarantineStore.QuarantineFileAsync(result.FilePath);
                 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -299,12 +316,15 @@ public partial class MainViewModel : ObservableObject
     {
         if (SelectedScanResult == null) return;
         
+        var selectedItem = SelectedScanResult;
+        var fileName = selectedItem.FileName;
+        
         try
         {
-            await _quarantineManager.QuarantineFileAsync(SelectedScanResult.FilePath);
-            ScanResults.Remove(SelectedScanResult);
+            await _quarantineStore.QuarantineFileAsync(selectedItem.FilePath);
+            ScanResults.Remove(selectedItem);
             LoadQuarantinedFiles();
-            MessageBox.Show($"تم نقل الملف للحجر الصحي:\n{SelectedScanResult.FileName}", 
+            MessageBox.Show($"تم نقل الملف للحجر الصحي:\n{fileName}", 
                 "تمت العملية", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -520,7 +540,7 @@ public partial class MainViewModel : ObservableObject
     // ==================== أوامر الحجر الصحي ====================
 
     [RelayCommand]
-    private async Task RestoreFileAsync(QuarantineEntry? entry)
+    private async Task RestoreFileAsync(QuarantineItemMetadata? entry)
     {
         if (entry == null) return;
 
@@ -532,16 +552,31 @@ public partial class MainViewModel : ObservableObject
 
         if (result == MessageBoxResult.Yes)
         {
-            if (await _quarantineManager.RestoreFileAsync(entry.Id))
+            try
             {
-                QuarantinedFiles.Remove(entry);
-                UpdateQuarantineCount();
+                if (await _quarantineStore.RestoreFileAsync(entry.Id))
+                {
+                    QuarantinedFiles.Remove(entry);
+                    UpdateQuarantineCount();
+                    MessageBox.Show($"تم استعادة الملف {entry.OriginalName} بنجاح إلى:\n{entry.OriginalPath}", 
+                        "تمت الاستعادة", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"لم يتم العثور على بيانات الحجر للملف {entry.OriginalName}.\nمعرف الحجر: {entry.Id}", 
+                        "خطأ في الاستعادة", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"فشل استعادة الملف {entry.OriginalName}.\n\nالتفاصيل: {ex.Message}", 
+                    "خطأ في الاستعادة", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }
 
     [RelayCommand]
-    private void DeleteQuarantinedFile(QuarantineEntry? entry)
+    private async Task DeleteQuarantinedFileAsync(QuarantineItemMetadata? entry)
     {
         if (entry == null) return;
 
@@ -553,11 +588,36 @@ public partial class MainViewModel : ObservableObject
 
         if (result == MessageBoxResult.Yes)
         {
-            if (_quarantineManager.DeleteQuarantinedFile(entry.Id))
+            if (await _quarantineStore.DeleteFileAsync(entry.Id))
             {
                 QuarantinedFiles.Remove(entry);
                 UpdateQuarantineCount();
             }
+        }
+    }
+
+    [RelayCommand]
+    private void RefreshQuarantine()
+    {
+        _quarantineStore.Reload();
+        LoadQuarantinedFiles();
+    }
+
+    [RelayCommand]
+    private async Task DeleteAllQuarantinedFilesAsync()
+    {
+        if (QuarantinedFiles.Count == 0) return;
+
+        var result = MessageBox.Show(
+            "هل تريد حذف جميع الملفات المحجورة نهائياً؟",
+            "تأكيد الحذف",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            await _quarantineStore.ClearAllAsync();
+            LoadQuarantinedFiles();
         }
     }
 
@@ -586,6 +646,104 @@ public partial class MainViewModel : ObservableObject
     {
         _realTimeMonitor.Stop();
         _realTimeMonitor.Dispose();
+        _pipeClient.Dispose();
+    }
+
+    // ==================== معالجات أحداث التهديد عبر IPC ====================
+
+    private void OnThreatActionRequired(object? sender, ThreatEventDto dto)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var decision = _dialogService.ShowThreatDecision(
+                dto.FileName, dto.FilePath, dto.AggregatedScore,
+                dto.Verdict, dto.Reasons);
+
+            if (decision.Cancelled) return;
+
+            var action = decision.Action switch
+            {
+                "Delete" => ThreatAction.Delete,
+                "Allow" => ThreatAction.Allow,
+                _ => ThreatAction.Quarantine
+            };
+
+            _ = _pipeClient.SendAsync(
+                ShieldAI.Core.Contracts.Commands.ResolveThreatAction,
+                new ResolveThreatRequest
+                {
+                    EventId = dto.EventId,
+                    Action = action,
+                    AddToExclusions = decision.AddToExclusions
+                });
+        });
+    }
+
+    private void OnThreatActionApplied(object? sender, ThreatEventDto dto)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var actionText = dto.ActionResult switch
+            {
+                "Quarantined" => "تم وضعه بالحجر الصحي",
+                "Deleted" => "تم حذف التهديد",
+                "Deleted from quarantine" => "تم حذف التهديد من الحجر",
+                _ when dto.ActionResult?.Contains("Allow") == true => "تم السماح بالملف",
+                _ => dto.ActionResult ?? "تم تنفيذ الإجراء"
+            };
+
+            App.Notifications?.ShowInfo(
+                "ShieldAI - إجراء تهديد",
+                $"{dto.FileName}: {actionText}");
+
+            LoadQuarantinedFiles();
+        });
+    }
+
+    private void OnThreatDetectedFromService(object? sender, ThreatDetectedEvent evt)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            // إنشاء نتيجة فحص موحّدة لعرضها في قائمة "آخر التهديدات"
+            var scanResult = new ScanResult
+            {
+                FilePath = evt.FilePath,
+                ThreatName = string.IsNullOrWhiteSpace(evt.ThreatName) ? "تهديد" : evt.ThreatName,
+                RiskScore = evt.RiskScore,
+                Verdict = evt.Verdict switch
+                {
+                    "Block" => ScanVerdict.Malicious,
+                    "Quarantine" => ScanVerdict.Malicious,
+                    _ => ScanVerdict.Suspicious
+                },
+                ScannedAt = DateTime.Now
+            };
+
+            var args = new ThreatDetectedEventArgs
+            {
+                JobId = Guid.Empty,
+                Result = scanResult,
+                AutoQuarantined = evt.AutoQuarantined
+            };
+
+            RecentThreats.Insert(0, args);
+            if (RecentThreats.Count > 50)
+                RecentThreats.RemoveAt(RecentThreats.Count - 1);
+
+            TotalThreatsDetected++;
+
+            var actionText = evt.AutoQuarantined
+                ? "تم نقله للحجر الصحي"
+                : "ملف مشبوه";
+
+            App.Notifications?.ShowThreatNotification(
+                "تهديد مكتشف - ShieldAI",
+                $"الملف: {Path.GetFileName(evt.FilePath)}\nالتهديد: {evt.ThreatName}\n{actionText}",
+                () => SelectedViewIndex = 3);
+
+            if (evt.AutoQuarantined)
+                LoadQuarantinedFiles();
+        });
     }
 
     // ==================== معالجات الأحداث ====================
@@ -642,7 +800,7 @@ public partial class MainViewModel : ObservableObject
 
     private void LoadQuarantinedFiles()
     {
-        var files = _quarantineManager.GetQuarantinedFiles();
+        var files = _quarantineStore.GetAllItems();
         QuarantinedFiles.Clear();
         foreach (var file in files)
         {

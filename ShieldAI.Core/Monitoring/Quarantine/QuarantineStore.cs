@@ -109,6 +109,100 @@ namespace ShieldAI.Core.Monitoring.Quarantine
         }
 
         /// <summary>
+        /// نقل الملف بشكل ذري إلى مجلد الحجر (لمنع التنفيذ أثناء الفحص)
+        /// </summary>
+        public async Task<(bool Success, string? MovedPath)> TryAtomicMoveToQuarantineAsync(
+            string filePath,
+            int maxRetries,
+            int initialDelayMs,
+            int maxDelayMs)
+        {
+            if (!File.Exists(filePath))
+                return (false, null);
+
+            EnsureDirectory();
+            var targetPath = Path.Combine(_quarantinePath, $"{Guid.NewGuid():N}.pending");
+            var delay = Math.Max(5, initialDelayMs);
+
+            for (var attempt = 0; attempt < Math.Max(1, maxRetries); attempt++)
+            {
+                try
+                {
+                    File.Move(filePath, targetPath);
+                    return (true, targetPath);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+
+                await Task.Delay(delay).ConfigureAwait(false);
+                delay = Math.Min(delay * 2, Math.Max(delay, maxDelayMs));
+            }
+
+            return (false, null);
+        }
+
+        /// <summary>
+        /// حجر ملف بعد نقله مسبقًا مع الحفاظ على المسار الأصلي
+        /// </summary>
+        public async Task<QuarantineItemMetadata?> QuarantineMovedFileAsync(
+            string movedFilePath,
+            string originalPath,
+            AggregatedThreatResult? scanResult = null)
+        {
+            if (!File.Exists(movedFilePath))
+                return null;
+
+            try
+            {
+                var fileInfo = new FileInfo(movedFilePath);
+                var originalName = Path.GetFileName(originalPath);
+
+                var metadata = scanResult != null
+                    ? QuarantineItemMetadata.FromAggregatedResult(originalPath, scanResult)
+                    : new QuarantineItemMetadata
+                    {
+                        OriginalPath = originalPath,
+                        OriginalName = originalName,
+                        FileSize = fileInfo.Length,
+                        Verdict = "Manual"
+                    };
+
+                metadata.OriginalPath = originalPath;
+                metadata.OriginalName = string.IsNullOrWhiteSpace(originalName) ? metadata.OriginalName : originalName;
+                metadata.FileSize = fileInfo.Length;
+
+                var quarantineFileName = metadata.Id + ".qar";
+                metadata.QuarantineFileName = quarantineFileName;
+
+                var quarantineFilePath = Path.Combine(_quarantinePath, quarantineFileName);
+
+                var originalData = await File.ReadAllBytesAsync(movedFilePath);
+                metadata.Sha256Hash = QuarantineCrypto.ComputeSha256(originalData);
+
+                var encryptedData = _crypto.Encrypt(originalData);
+                await File.WriteAllBytesAsync(quarantineFilePath, encryptedData);
+
+                File.Delete(movedFilePath);
+
+                lock (_lock)
+                {
+                    _items[metadata.Id] = metadata;
+                }
+
+                await SaveMetadataAsync();
+                return metadata;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
         /// استعادة ملف من الحجر مع تحقق hash
         /// </summary>
         public async Task<bool> RestoreFileAsync(string itemId, string? restorePath = null)
@@ -123,59 +217,52 @@ namespace ShieldAI.Core.Monitoring.Quarantine
 
             var quarantineFilePath = Path.Combine(_quarantinePath, metadata.QuarantineFileName);
             if (!File.Exists(quarantineFilePath))
-                return false;
+                throw new FileNotFoundException($"ملف الحجر غير موجود: {quarantineFilePath}");
 
-            try
+            // قراءة وفك التشفير
+            var encryptedData = await File.ReadAllBytesAsync(quarantineFilePath);
+            var originalData = _crypto.Decrypt(encryptedData);
+
+            // تحقق hash قبل الإرجاع
+            var currentHash = QuarantineCrypto.ComputeSha256(originalData);
+            if (!string.IsNullOrEmpty(metadata.Sha256Hash) &&
+                !currentHash.Equals(metadata.Sha256Hash, StringComparison.OrdinalIgnoreCase))
             {
-                // قراءة وفك التشفير
-                var encryptedData = await File.ReadAllBytesAsync(quarantineFilePath);
-                var originalData = _crypto.Decrypt(encryptedData);
-
-                // تحقق hash قبل الإرجاع
-                var currentHash = QuarantineCrypto.ComputeSha256(originalData);
-                if (!string.IsNullOrEmpty(metadata.Sha256Hash) &&
-                    !currentHash.Equals(metadata.Sha256Hash, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new CryptographicException(
-                        "فشل التحقق من سلامة الملف - البصمة لا تتطابق مع الأصل");
-                }
-
-                // تحديد مسار الاستعادة
-                var targetPath = restorePath ?? metadata.OriginalPath;
-                if (!IsRestorePathSafe(targetPath) && !IsCurrentUserAdmin())
-                {
-                    throw new UnauthorizedAccessException("مسار الاستعادة غير آمن ويتطلب صلاحيات Admin");
-                }
-
-                // التأكد من وجود المجلد
-                var directory = Path.GetDirectoryName(targetPath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                    Directory.CreateDirectory(directory);
-
-                // إذا كان الملف موجودًا، نضيف رقم
-                targetPath = GetUniqueFilePath(targetPath);
-
-                // كتابة الملف المستعاد
-                await File.WriteAllBytesAsync(targetPath, originalData);
-
-                // حذف ملف الحجر
-                File.Delete(quarantineFilePath);
-
-                // تحديث metadata
-                lock (_lock)
-                {
-                    metadata.IsRestored = true;
-                    metadata.RestoredAt = DateTime.Now;
-                    _items.Remove(itemId);
-                }
-
-                await SaveMetadataAsync();
-                return true;
+                throw new CryptographicException(
+                    "فشل التحقق من سلامة الملف - البصمة لا تتطابق مع الأصل");
             }
-            catch
+
+            // تحديد مسار الاستعادة
+            var targetPath = restorePath ?? metadata.OriginalPath;
+            if (!IsRestorePathSafe(targetPath) && !IsCurrentUserAdmin())
             {
-                return false;
+                throw new UnauthorizedAccessException("مسار الاستعادة غير آمن ويتطلب صلاحيات Admin");
             }
+
+            // التأكد من وجود المجلد
+            var directory = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                Directory.CreateDirectory(directory);
+
+            // إذا كان الملف موجودًا، نضيف رقم
+            targetPath = GetUniqueFilePath(targetPath);
+
+            // كتابة الملف المستعاد
+            await File.WriteAllBytesAsync(targetPath, originalData);
+
+            // حذف ملف الحجر
+            File.Delete(quarantineFilePath);
+
+            // تحديث metadata
+            lock (_lock)
+            {
+                metadata.IsRestored = true;
+                metadata.RestoredAt = DateTime.Now;
+                _items.Remove(itemId);
+            }
+
+            await SaveMetadataAsync();
+            return true;
         }
 
         /// <summary>
@@ -213,6 +300,14 @@ namespace ShieldAI.Core.Monitoring.Quarantine
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// إعادة تحميل البيانات من القرص
+        /// </summary>
+        public void Reload()
+        {
+            LoadMetadata();
         }
 
         /// <summary>
@@ -273,15 +368,15 @@ namespace ShieldAI.Core.Monitoring.Quarantine
                 {
                     if (File.Exists(_metadataPath))
                     {
-                        if (!ValidateMetadataHmac())
-                        {
-                            _items = new Dictionary<string, QuarantineItemMetadata>();
-                            return;
-                        }
-
                         var json = File.ReadAllText(_metadataPath);
                         _items = JsonSerializer.Deserialize<Dictionary<string, QuarantineItemMetadata>>(json)
                             ?? new Dictionary<string, QuarantineItemMetadata>();
+
+                        // إذا فشل التحقق من HMAC، نعيد توليده لإصلاح البيانات
+                        if (!ValidateMetadataHmac())
+                        {
+                            Task.Run(() => SaveMetadataAsync()).Wait();
+                        }
                     }
                 }
                 catch
@@ -365,6 +460,18 @@ namespace ShieldAI.Core.Monitoring.Quarantine
                     InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
                     PropagationFlags.None,
                     AccessControlType.Allow));
+
+                // إضافة المستخدم الحالي (هوية الخدمة أو المستخدم المشغّل)
+                using var identity = WindowsIdentity.GetCurrent();
+                if (identity.User != null)
+                {
+                    security.AddAccessRule(new FileSystemAccessRule(
+                        identity.User,
+                        FileSystemRights.FullControl,
+                        InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                        PropagationFlags.None,
+                        AccessControlType.Allow));
+                }
 
                 dirInfo.SetAccessControl(security);
             }

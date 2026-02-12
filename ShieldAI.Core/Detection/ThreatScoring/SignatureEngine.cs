@@ -49,17 +49,9 @@ namespace ShieldAI.Core.Detection.ThreatScoring
 
                 if (match != null)
                 {
-                    result.Score = match.Signature.ThreatLevel switch
-                    {
-                        ThreatLevel.Critical => 95,
-                        ThreatLevel.High => 80,
-                        ThreatLevel.Medium => 60,
-                        ThreatLevel.Low => 30,
-                        _ => 50
-                    };
-
-                    result.Verdict = result.Score >= 60 ? EngineVerdict.Malicious : EngineVerdict.Suspicious;
-                    result.Confidence = 0.95;
+                    result.Score = 100;
+                    result.Verdict = EngineVerdict.Malicious;
+                    result.Confidence = 1.0;
 
                     result.Reasons.Add($"تطابق مع توقيع معروف: {match.Signature.MalwareName}");
                     result.Reasons.Add($"عائلة البرمجية الخبيثة: {match.Signature.MalwareFamily}");

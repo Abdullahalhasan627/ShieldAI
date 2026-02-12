@@ -173,6 +173,9 @@ namespace ShieldAI.Service.Workers
                     Commands.RestoreFromQuarantine => HandleQuarantineRestore(command, worker),
                     Commands.DeleteFromQuarantine => HandleQuarantineDelete(command, worker),
 
+                    Commands.ResolveThreatAction => await HandleResolveThreatAsync(command, worker),
+                    Commands.GetPendingThreats => HandleGetPendingThreats(command, worker),
+
                     _ => ResponseEnvelope.Fail(command.Id, $"Unknown command: {command.CommandType}")
                 };
             }
@@ -300,6 +303,34 @@ namespace ShieldAI.Service.Workers
             return success 
                 ? ResponseEnvelope.Ok(command.Id) 
                 : ResponseEnvelope.Fail(command.Id, "Failed to delete file");
+        }
+
+        private async Task<ResponseEnvelope> HandleResolveThreatAsync(CommandEnvelope command, ShieldAIWorker worker)
+        {
+            var request = command.GetPayload<ResolveThreatRequest>();
+            if (request == null)
+                return ResponseEnvelope.Fail(command.Id, "Invalid request");
+
+            var executor = worker.ActionExecutor;
+            if (executor == null)
+                return ResponseEnvelope.Fail(command.Id, "ActionExecutor not available");
+
+            var response = await executor.ResolveThreatAsync(request);
+            return response.Success
+                ? ResponseEnvelope.Ok(command.Id, response)
+                : ResponseEnvelope.Fail(command.Id, response.Error ?? "Failed");
+        }
+
+        private ResponseEnvelope HandleGetPendingThreats(CommandEnvelope command, ShieldAIWorker worker)
+        {
+            var executor = worker.ActionExecutor;
+            if (executor == null)
+                return ResponseEnvelope.Ok(command.Id, new PendingThreatsResponse());
+
+            return ResponseEnvelope.Ok(command.Id, new PendingThreatsResponse
+            {
+                PendingThreats = executor.GetPendingThreats()
+            });
         }
 
         #endregion

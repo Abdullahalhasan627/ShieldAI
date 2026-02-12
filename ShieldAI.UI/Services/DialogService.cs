@@ -48,6 +48,21 @@ namespace ShieldAI.UI.Services
         /// فتح حوار حفظ ملف
         /// </summary>
         string? ShowSaveFileDialog(string defaultName = "", string filter = "All Files|*.*", string title = "حفظ كـ");
+
+        /// <summary>
+        /// عرض نافذة قرار التهديد — Delete / Quarantine / Allow
+        /// </summary>
+        ThreatDecisionResult ShowThreatDecision(string fileName, string filePath, int score, string verdict, List<string> reasons);
+    }
+
+    /// <summary>
+    /// نتيجة قرار المستخدم على التهديد
+    /// </summary>
+    public class ThreatDecisionResult
+    {
+        public string Action { get; set; } = "Quarantine"; // Delete, Quarantine, Allow
+        public bool AddToExclusions { get; set; }
+        public bool Cancelled { get; set; }
     }
 
     /// <summary>
@@ -108,6 +123,39 @@ namespace ShieldAI.UI.Services
             };
 
             return dialog.ShowDialog() == true ? dialog.FileName : null;
+        }
+
+        public ThreatDecisionResult ShowThreatDecision(string fileName, string filePath, int score, string verdict, List<string> reasons)
+        {
+            var reasonsText = reasons.Count > 0
+                ? string.Join("\n", reasons.Take(4).Select(r => $"  • {r}"))
+                : "  • غير محدد";
+
+            var message =
+                $"تم اكتشاف تهديد!\n\n" +
+                $"الملف: {fileName}\n" +
+                $"المسار: {filePath}\n" +
+                $"الدرجة: {score}/100\n" +
+                $"الحكم: {verdict}\n\n" +
+                $"الأسباب:\n{reasonsText}\n\n" +
+                $"اختر الإجراء:\n" +
+                $"  [نعم] = حذف نهائي\n" +
+                $"  [لا] = نقل للحجر الصحي\n" +
+                $"  [إلغاء] = السماح بالملف";
+
+            var result = MessageBox.Show(
+                message,
+                "تهديد مكتشف - ShieldAI",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Warning);
+
+            return result switch
+            {
+                MessageBoxResult.Yes => new ThreatDecisionResult { Action = "Delete" },
+                MessageBoxResult.No => new ThreatDecisionResult { Action = "Quarantine" },
+                MessageBoxResult.Cancel => new ThreatDecisionResult { Action = "Allow", AddToExclusions = true },
+                _ => new ThreatDecisionResult { Cancelled = true }
+            };
         }
     }
 }

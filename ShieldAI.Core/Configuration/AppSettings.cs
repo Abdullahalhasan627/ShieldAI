@@ -212,6 +212,114 @@ namespace ShieldAI.Core.Configuration
         /// مدة صلاحية الكاش بالدقائق
         /// </summary>
         public int ScanCacheTtlMinutes { get; set; } = 30;
+
+        /// <summary>
+        /// الحد الأقصى لعناصر كاش الفحص
+        /// </summary>
+        public int ScanCacheMaxEntries { get; set; } = 20_000;
+        #endregion
+
+        #region Quick Gate / Atomic Quarantine
+        /// <summary>
+        /// حد الاشتباه السريع (Quick Gate)
+        /// </summary>
+        public int QuickGateSuspiciousScore { get; set; } = 35;
+
+        /// <summary>
+        /// عدد المحاولات لنقل الملف للحجر بشكل ذري
+        /// </summary>
+        public int AtomicMoveMaxRetries { get; set; } = 6;
+
+        /// <summary>
+        /// تأخير أولي بالمللي ثانية قبل إعادة المحاولة
+        /// </summary>
+        public int AtomicMoveInitialDelayMs { get; set; } = 60;
+
+        /// <summary>
+        /// الحد الأقصى لتأخير إعادة المحاولة
+        /// </summary>
+        public int AtomicMoveMaxDelayMs { get; set; } = 800;
+        #endregion
+
+        #region Second Opinion Policy
+        /// <summary>
+        /// تفعيل Windows Defender كرأي ثانٍ
+        /// </summary>
+        public bool EnableDefenderSecondOpinion { get; set; } = true;
+
+        /// <summary>
+        /// تفعيل VirusTotal كرأي ثانٍ
+        /// </summary>
+        public bool EnableVirusTotalSecondOpinion { get; set; } = false;
+
+        /// <summary>
+        /// الحد الأدنى لمنطقة الشك (Suspicion zone)
+        /// </summary>
+        public int SuspicionScoreMin { get; set; } = 30;
+
+        /// <summary>
+        /// الحد الأقصى لمنطقة الشك (Suspicion zone)
+        /// </summary>
+        public int SuspicionScoreMax { get; set; } = 65;
+
+        /// <summary>
+        /// الحد الأدنى لدرجة تشغيل VirusTotal
+        /// </summary>
+        public int VirusTotalMinScore { get; set; } = 30;
+
+        /// <summary>
+        /// الحد الأقصى لدرجة تشغيل VirusTotal
+        /// </summary>
+        public int VirusTotalMaxScore { get; set; } = 65;
+
+        /// <summary>
+        /// تشغيل VirusTotal إذا كان غير موقع وفي مسار مشبوه
+        /// </summary>
+        public bool VirusTotalWhenUnsignedSuspiciousPath { get; set; } = true;
+
+        /// <summary>
+        /// تشغيل Defender عند تعارض ML مع Heuristic
+        /// </summary>
+        public bool DefenderWhenDisagree { get; set; } = true;
+
+        /// <summary>
+        /// تشغيل Defender إذا الملف من Temp/AppData
+        /// </summary>
+        public bool DefenderWhenTempOrAppData { get; set; } = true;
+        #endregion
+
+        #region RealTime Action Policy
+        /// <summary>
+        /// وضع الإجراء عند اكتشاف تهديد فوري: AutoQuarantine, AskUser, AutoBlock
+        /// </summary>
+        public string RealTimeActionMode { get; set; } = "AutoQuarantine";
+
+        /// <summary>
+        /// الحد الأدنى لسؤال المستخدم (AskUser mode)
+        /// </summary>
+        public int AskUserMinScore { get; set; } = 55;
+
+        /// <summary>
+        /// الحد الأدنى للحجر التلقائي بدون سؤال (حتى في AskUser mode)
+        /// </summary>
+        public int AutoQuarantineMinScore { get; set; } = 80;
+
+        /// <summary>
+        /// قائمة SHA256 المسموح بها (Allowlist)
+        /// </summary>
+        public List<string> Sha256Allowlist { get; set; } = new();
+        #endregion
+
+        #region Degraded Mode
+        /// <summary>
+        /// حد الضغط لتفعيل الوضع المخفف
+        /// </summary>
+        public int DegradedModeThreshold { get; set; } = 2_000;
+
+        /// <summary>
+        /// حد التعافي لإلغاء الوضع المخفف
+        /// </summary>
+        public int DegradedRecoveryThreshold { get; set; } = 800;
         #endregion
 
         #region Logging

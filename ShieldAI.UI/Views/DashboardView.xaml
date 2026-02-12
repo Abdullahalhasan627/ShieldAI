@@ -67,7 +67,7 @@
                 </Border>
                 
                 <!-- الحجر الصحي -->
-                <Border Style="{StaticResource CardStyle}">
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,12,0">
                     <StackPanel>
                         <TextBlock Text="🔒" FontSize="32"/>
                         <TextBlock Text="{Binding QuarantineCount}" 
@@ -77,6 +77,12 @@
                         <TextBlock Text="ملف في الحجر" 
                                    Style="{StaticResource BodyStyle}"
                                    Margin="0,4,0,0"/>
+                        <Button Content="🔍 عرض الملفات"
+                                Style="{StaticResource WarningButtonStyle}"
+                                Command="{Binding ViewQuarantineCommand}"
+                                Margin="0,12,0,0"
+                                FontSize="12"
+                                Padding="8,4"/>
                     </StackPanel>
                 </Border>
             </UniformGrid>
@@ -132,16 +138,16 @@
                                                    Margin="0,0,12,0"/>
                                         
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding ScanResult.Threat.Name}" 
+                                            <TextBlock Text="{Binding Result.ThreatName}" 
                                                        Foreground="{StaticResource TextPrimaryBrush}"
                                                        FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding FilePath}" 
+                                            <TextBlock Text="{Binding Result.FilePath}" 
                                                        Style="{StaticResource BodyStyle}"
                                                        TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                         
                                         <TextBlock Grid.Column="2" 
-                                                   Text="{Binding DetectionTime, StringFormat='{}{0:HH:mm}'}" 
+                                                   Text="{Binding Result.ScannedAt, StringFormat='{}{0:HH:mm}'}" 
                                                    Style="{StaticResource BodyStyle}"
                                                    VerticalAlignment="Center"/>
                                     </Grid>

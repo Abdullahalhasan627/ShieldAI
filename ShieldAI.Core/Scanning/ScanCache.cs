@@ -16,10 +16,12 @@ namespace ShieldAI.Core.Scanning
     {
         private readonly ConcurrentDictionary<string, CacheEntry> _entries = new();
         private readonly TimeSpan _ttl;
+        private readonly int _maxEntries;
 
-        public ScanCache(TimeSpan? ttl = null)
+        public ScanCache(TimeSpan? ttl = null, int maxEntries = 20_000)
         {
             _ttl = ttl ?? TimeSpan.FromMinutes(30);
+            _maxEntries = Math.Max(1, maxEntries);
         }
 
         public bool TryGet(string sha256, long fileSize, DateTime lastWriteUtc, out AggregatedThreatResult? result)
@@ -43,6 +45,7 @@ namespace ShieldAI.Core.Scanning
         {
             var key = BuildKey(sha256, fileSize, lastWriteUtc);
             _entries[key] = new CacheEntry(result);
+            TrimIfNeeded();
         }
 
         public void ClearExpired()
@@ -51,6 +54,25 @@ namespace ShieldAI.Core.Scanning
             {
                 if (DateTime.UtcNow - kvp.Value.TimestampUtc > _ttl)
                     _entries.TryRemove(kvp.Key, out _);
+            }
+        }
+
+        private void TrimIfNeeded()
+        {
+            if (_entries.Count <= _maxEntries)
+                return;
+
+            ClearExpired();
+
+            var excess = _entries.Count - _maxEntries;
+            if (excess <= 0)
+                return;
+
+            foreach (var entry in _entries
+                         .OrderBy(kvp => kvp.Value.TimestampUtc)
+                         .Take(excess))
+            {
+                _entries.TryRemove(entry.Key, out _);
             }
         }
 

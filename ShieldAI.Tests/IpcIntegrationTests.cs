@@ -1,3 +1,4 @@
+#if HAS_UI_REF
 using System.IO.Pipes;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -189,3 +190,4 @@ public class IpcIntegrationTests : IAsyncLifetime
 
     
 }
+#endif

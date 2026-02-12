@@ -37,48 +37,53 @@
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal">
                         <TextBlock Text="عدد الملفات: " Style="{StaticResource BodyStyle}"/>
-                        <TextBlock Text="{Binding TotalFiles}" Foreground="{StaticResource TextPrimaryBrush}" Margin="4,0,16,0"/>
+                        <TextBlock Text="{Binding QuarantinedFiles.Count}" Foreground="{StaticResource TextPrimaryBrush}" Margin="4,0,16,0"/>
                         <TextBlock Text="الحجم الإجمالي: " Style="{StaticResource BodyStyle}"/>
-                        <TextBlock Text="{Binding TotalSize}" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock Text="{Binding QuarantineCount}" Foreground="{StaticResource TextPrimaryBrush}"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button Content="تحديث"
-                                Command="{Binding RefreshCommand}"
+                                Command="{Binding RefreshQuarantineCommand}"
                                 Style="{StaticResource ModernButtonStyle}"
                                 Padding="12,6"
                                 Margin="0,0,8,0"/>
                         <Button Content="حذف الكل"
-                                Command="{Binding DeleteAllCommand}"
+                                Command="{Binding DeleteAllQuarantinedFilesCommand}"
                                 Style="{StaticResource DangerButtonStyle}"
                                 Padding="12,6"/>
                     </StackPanel>
                 </Grid>
 
                 <ListView Grid.Row="1" ItemsSource="{Binding QuarantinedFiles}"
-                          SelectedItem="{Binding SelectedItem}"
                           Style="{StaticResource ModernListViewStyle}"
                           ItemContainerStyle="{StaticResource ModernListViewItemStyle}">
                     <ListView.View>
                         <GridView>
+                            <!-- اسم الملف من QuarantineItemMetadata.OriginalName -->
                             <GridViewColumn Header="الملف" Width="200" 
-                                            DisplayMemberBinding="{Binding FileName}"/>
+                                            DisplayMemberBinding="{Binding OriginalName}"/>
+
                             
+                            <!-- المسار الأصلي -->
                             <GridViewColumn Header="المسار الأصلي" Width="300" 
                                             DisplayMemberBinding="{Binding OriginalPath}"/>
                             
-                            <GridViewColumn Header="الحجم" Width="100" 
-                                            DisplayMemberBinding="{Binding SizeText}"/>
+                            <!-- الحجم (بالبايت من FileSize) -->
+                            <GridViewColumn Header="الحجم (بايت)" Width="120" 
+                                            DisplayMemberBinding="{Binding FileSize}"/>
                             
-                            <GridViewColumn Header="تاريخ الحجر" Width="150">
+                            <!-- تاريخ الحجر من QuarantinedAt -->
+                            <GridViewColumn Header="تاريخ الحجر" Width="170">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding QuarantinedDate, StringFormat='{}{0:yyyy/MM/dd HH:mm}'}"/>
+                                        <TextBlock Text="{Binding QuarantinedAt, StringFormat='{}{0:yyyy/MM/dd HH:mm}'}"/>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
                             
-                            <GridViewColumn Header="الإجراءات" Width="180">
+                            <!-- أزرار الإجراءات: تستدعي أوامر MainViewModel -->
+                            <GridViewColumn Header="الإجراءات" Width="200">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">
@@ -86,12 +91,12 @@
                                                     Style="{StaticResource SuccessButtonStyle}"
                                                     Padding="12,6"
                                                     Margin="0,0,8,0"
-                                                    Command="{Binding DataContext.RestoreCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                    Command="{Binding DataContext.RestoreFileCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
                                                     CommandParameter="{Binding}"/>
                                             <Button Content="حذف" 
                                                     Style="{StaticResource DangerButtonStyle}"
                                                     Padding="12,6"
-                                                    Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                                    Command="{Binding DataContext.DeleteQuarantinedFileCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
                                                     CommandParameter="{Binding}"/>
                                         </StackPanel>
                                     </DataTemplate>
@@ -101,10 +106,19 @@
                     </ListView.View>
                 </ListView>
                 
-                <!-- رسالة عند عدم وجود ملفات -->
+                <!-- رسالة عند عدم وجود ملفات - تظهر فقط عندما لا توجد ملفات -->
                 <StackPanel Grid.Row="1" VerticalAlignment="Center" 
-                            HorizontalAlignment="Center"
-                            Visibility="{Binding IsLoading, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                            HorizontalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding QuarantinedFiles.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <TextBlock Text="🔒" FontSize="64" HorizontalAlignment="Center"/>
                     <TextBlock Text="لا توجد ملفات في الحجر الصحي" 
                                Style="{StaticResource SubHeaderStyle}"
